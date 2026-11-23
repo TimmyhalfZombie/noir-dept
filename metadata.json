@@ -1,0 +1,6 @@
+{
+  "name": "NOIR DEPT.",
+  "description": "Independent resale shop for secondhand branded streetwear, graphic hoodies, and distinctive pre-loved pieces.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
