@@ -100,14 +100,8 @@ export const products: Product[] = [
       length: '28"',
       sleeve: '25"',
     },
-    frontImage: resolveProductImage(
-      'item-1-front',
-      'https://shop.shoegamemanila.com/cdn/shop/files/IMG_0251.webp?v=1759832558'
-    ),
-    backImage: resolveProductImage(
-      'item-1-back',
-      'https://images.stockx.com/images/Chrome-Hearts-Horseshoe-Floral-Cross-Sleeve-Zip-Up-Hoodie-Black-White.jpg'
-    ),
+    frontImage: resolveProductImage('item-1-front', '/images/item-1-front.jpg'),
+    backImage: resolveProductImage('item-1-back', '/images/item-1-back.jpg'),
     isSample: true,
   },
   {
@@ -124,14 +118,8 @@ export const products: Product[] = [
       length: '27.5"',
       sleeve: '24.5"',
     },
-    frontImage: resolveProductImage(
-      'item-2-front',
-      'https://cdn.media.amplience.net/i/carhartt_wip/I033661_00M_XX-ST-01?%24ST%24=&fmt=auto&w=1200&qlt=default'
-    ),
-    backImage: resolveProductImage(
-      'item-2-back',
-      'https://cdn.media.amplience.net/i/carhartt_wip/I033661_00M_XX-ST-02?%24ST%24=&fmt=auto&w=1200&qlt=default'
-    ),
+    frontImage: resolveProductImage('item-2-front', '/images/item-2-front.jpg'),
+    backImage: resolveProductImage('item-2-back', '/images/item-2-back.jpg'),
     isSample: true,
   },
   {
@@ -148,14 +136,8 @@ export const products: Product[] = [
       length: '29.5"',
       sleeve: '26"',
     },
-    frontImage: resolveProductImage(
-      'item-3-front',
-      'https://media.endclothing.com/media/catalog/product/0/7/07-12-2022_gh_217976-kk001-nbk_m1.jpg'
-    ),
-    backImage: resolveProductImage(
-      'item-3-back',
-      'https://media.endclothing.com/media/catalog/product/0/7/07-12-2022_gh_217976-kk001-nbk_2.jpg'
-    ),
+    frontImage: resolveProductImage('item-3-front', '/images/item-3-front.jpg'),
+    backImage: resolveProductImage('item-3-back', '/images/item-3-back.jpg'),
     isSample: true,
   },
   {
@@ -172,14 +154,8 @@ export const products: Product[] = [
       length: '26.5"',
       sleeve: '24"',
     },
-    frontImage: resolveProductImage(
-      'item-4-front',
-      'https://us.bape.com/cdn/shop/files/001ZPM301007_YEL_A_V2_336c4cba-35ac-4a0d-a988-a81cfccbe0a0.jpg'
-    ),
-    backImage: resolveProductImage(
-      'item-4-back',
-      'https://us.bape.com/cdn/shop/files/001ZPL801310_YEL_B_V2_69ee8b57-4c42-45a9-aa7f-36ad5c8a17f8.jpg?v=1786597790&width=1200'
-    ),
+    frontImage: resolveProductImage('item-4-front', '/images/item-4-front.jpg'),
+    backImage: resolveProductImage('item-4-back', '/images/item-4-back.jpg'),
     isSample: true,
   },
   {
@@ -196,14 +172,8 @@ export const products: Product[] = [
       length: '28"',
       sleeve: '24.5"',
     },
-    frontImage: resolveProductImage(
-      'item-5-front',
-      'https://us.aape.com/cdn/shop/files/AAPSWM3834XXHBKX-pdp-1_grande.jpg?v=1771771697'
-    ),
-    backImage: resolveProductImage(
-      'item-5-back',
-      'https://us.aape.com/cdn/shop/files/AAPSWM3834XXHBKX-pdp-2_grande.jpg?v=1771771697'
-    ),
+    frontImage: resolveProductImage('item-5-front', '/images/item-5-front.jpg'),
+    backImage: resolveProductImage('item-5-back', '/images/item-5-back.jpg'),
     isSample: true,
   },
   {
@@ -220,14 +190,8 @@ export const products: Product[] = [
       length: '26"',
       sleeve: '23.5"',
     },
-    frontImage: resolveProductImage(
-      'item-6-front',
-      'https://www.stussy.com/cdn/shop/files/1925000_BLAC_1.jpg'
-    ),
-    backImage: resolveProductImage(
-      'item-6-back',
-      'https://www.stussy.com/cdn/shop/files/1925000_BLAC_2.jpg'
-    ),
+    frontImage: resolveProductImage('item-6-front', '/images/item-6-front.jpg'),
+    backImage: resolveProductImage('item-6-back', '/images/item-6-back.jpg'),
     isSample: true,
   },
 ];

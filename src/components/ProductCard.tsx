@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { siteConfig } from '../config/siteConfig';
 import {
   getFallbackPlaceholder,
   getProductImageAlt,
   type Product,
 } from '../data/products';
-import { getTheme, type Theme } from '../ui/theme';
+import { getTheme } from '../ui/theme';
 
 interface ProductCardProps {
   product: Product;
@@ -13,26 +13,17 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, onSelect }: ProductCardProps) {
-  const [theme, setTheme] = useState<Theme>(() => getTheme());
   const [showBackTouch, setShowBackTouch] = useState(false);
   const [frontError, setFrontError] = useState(false);
   const [backError, setBackError] = useState(false);
 
-  useEffect(() => {
-    const onThemeChange = (e: Event) => {
-      setTheme((e as CustomEvent<Theme>).detail ?? getTheme());
-    };
-    window.addEventListener('noir-theme-change', onThemeChange);
-    return () => window.removeEventListener('noir-theme-change', onThemeChange);
-  }, []);
-
   const isSold = product.status === 'SOLD';
 
   const frontSrc = frontError
-    ? getFallbackPlaceholder('Front', theme)
+    ? getFallbackPlaceholder('Front', getTheme())
     : product.frontImage;
   const backSrc = backError
-    ? getFallbackPlaceholder('Back', theme)
+    ? getFallbackPlaceholder('Back', getTheme())
     : product.backImage;
 
   const statusTone =
@@ -42,26 +33,19 @@ export function ProductCard({ product, onSelect }: ProductCardProps) {
       ? 'text-steel'
       : 'text-stone line-through';
 
-  const imageFilter = isSold
-    ? 'grayscale(100%)'
-    : 'grayscale(15%) contrast(1.02)';
-
   return (
     <article className="group relative flex flex-col bg-noir border border-charcoal hover:border-ivory has-[.card-trigger:focus-visible]:outline-1 has-[.card-trigger:focus-visible]:outline-ivory has-[.card-trigger:focus-visible]:outline-offset-2 transition-colors duration-200">
       {/* Square photo container */}
       <div className="relative aspect-square w-full overflow-hidden bg-charcoal border-b border-charcoal">
         {/* Front image */}
         <img
-          data-ink-live
           src={frontSrc}
           alt={getProductImageAlt(product, 'front')}
           width={800}
           height={800}
           loading="lazy"
           decoding="async"
-          referrerPolicy="no-referrer"
           onError={() => setFrontError(true)}
-          style={{ filter: imageFilter }}
           className={`h-full w-full object-cover transition-[opacity,transform] duration-500 ease-out [@media(hover:hover)]:group-hover:scale-[1.03] [@media(hover:hover)]:group-hover:opacity-0 ${
             showBackTouch ? 'opacity-0' : isSold ? 'opacity-60' : 'opacity-100'
           }`}
@@ -69,17 +53,14 @@ export function ProductCard({ product, onSelect }: ProductCardProps) {
 
         {/* Back image */}
         <img
-          data-ink-live
           src={backSrc}
           alt={getProductImageAlt(product, 'back')}
           width={800}
           height={800}
           loading="lazy"
           decoding="async"
-          referrerPolicy="no-referrer"
           aria-hidden="true"
           onError={() => setBackError(true)}
-          style={{ filter: imageFilter }}
           className={`absolute inset-0 h-full w-full object-cover transition-[opacity,transform] duration-500 ease-out [@media(hover:hover)]:group-hover:scale-[1.03] ${
             isSold
               ? '[@media(hover:hover)]:group-hover:opacity-60'

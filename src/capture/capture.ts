@@ -131,9 +131,30 @@ export async function capturePage(theme: Theme, scale: number, maxTextureSize: n
     useCORS: true,
     onclone: (doc) => {
       doc.documentElement.dataset.theme = theme;
+
+      // Force every scroll-reveal element to its final visible state in the cloned document
+      // only, and disable transitions/animations so html2canvas captures a clean static frame.
+      const style = doc.createElement('style');
+      style.textContent =
+        '*,*::before,*::after{transition:none!important;animation:none!important}' +
+        '[data-reveal]{opacity:1!important;transform:none!important;visibility:visible!important;filter:none!important}';
+      doc.head.appendChild(style);
+
+      doc.querySelectorAll<HTMLElement>('[data-reveal]').forEach((el) => {
+        el.style.setProperty('opacity', '1', 'important');
+        el.style.setProperty('transform', 'none', 'important');
+        el.style.setProperty('visibility', 'visible', 'important');
+      });
+
+      // Ensure below-the-fold lazy images render into full-document snapshots.
+      doc.querySelectorAll<HTMLImageElement>('img').forEach((img) => {
+        img.loading = 'eager';
+      });
+
       normalizeModernColors(doc);
-      // Live elements (navbar, grain, filtered images) stay out of the snapshot. `visibility`
-      // (not data-html2canvas-ignore) keeps their boxes in layout so nothing shifts.
+
+      // Live elements above the ink canvas (navbar, grain) stay out of the snapshot.
+      // `visibility` (not data-html2canvas-ignore) keeps their boxes in layout so nothing shifts.
       doc.querySelectorAll<HTMLElement>('[data-ink-live]').forEach((el) => {
         el.style.visibility = 'hidden';
       });

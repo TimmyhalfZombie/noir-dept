@@ -91,7 +91,6 @@ export function AboutPage() {
 
                 {showPortraitImage ? (
                   <img
-                    data-ink-live
                     src={founder.portraitSrc}
                     alt={founder.portraitAlt}
                     width={1000}

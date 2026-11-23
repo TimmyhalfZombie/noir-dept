@@ -93,8 +93,13 @@ export function PlanetaryRing({ heroRef, children }: PlanetaryRingProps) {
     let currentY = 0;
     let rafId = 0;
     let active = false;
+    let transitioning = document.documentElement.dataset.themeTransitioning === 'true';
 
     const step = () => {
+      if (transitioning) {
+        active = false;
+        return;
+      }
       currentX += (targetX - currentX) * 0.07;
       currentY += (targetY - currentY) * 0.07;
 
@@ -110,9 +115,19 @@ export function PlanetaryRing({ heroRef, children }: PlanetaryRingProps) {
     };
 
     const kick = () => {
-      if (!active) {
+      if (!active && !transitioning) {
         active = true;
         rafId = window.requestAnimationFrame(step);
+      }
+    };
+
+    const onThemeTransitioning = (e: Event) => {
+      transitioning = Boolean((e as CustomEvent<{ active?: boolean }>).detail?.active);
+      if (transitioning) {
+        window.cancelAnimationFrame(rafId);
+        active = false;
+      } else if (Math.abs(targetX - currentX) > 0.02 || Math.abs(targetY - currentY) > 0.02) {
+        kick();
       }
     };
 
@@ -132,11 +147,13 @@ export function PlanetaryRing({ heroRef, children }: PlanetaryRingProps) {
       kick();
     };
 
+    window.addEventListener('theme-transitioning', onThemeTransitioning);
     heroEl.addEventListener('mousemove', onMouseMove, { passive: true });
     heroEl.addEventListener('mouseleave', onMouseLeave, { passive: true });
 
     return () => {
       window.cancelAnimationFrame(rafId);
+      window.removeEventListener('theme-transitioning', onThemeTransitioning);
       heroEl.removeEventListener('mousemove', onMouseMove);
       heroEl.removeEventListener('mouseleave', onMouseLeave);
     };

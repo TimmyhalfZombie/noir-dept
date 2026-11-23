@@ -264,15 +264,14 @@ html.theme-fade *::after {
   animation-play-state: paused !important;
 }
 
-/* Founder portrait filmic monochrome treatment */
+/* Founder portrait (filmic monochrome baked into /public/images/founder.jpg) */
 .founder-portrait-img {
-  filter: grayscale(100%) contrast(1.05) brightness(0.95);
-  transition: filter 0.6s ease;
+  transition: opacity 0.6s ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .founder-portrait-img:hover {
-    filter: grayscale(80%) contrast(1.05) brightness(0.95);
+    opacity: 0.94;
   }
 }
 

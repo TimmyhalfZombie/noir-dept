@@ -1,6 +1,6 @@
 // Adapted from Ink Bleed by Codemure (MIT License)
 import gsap from 'gsap';
-import { capturePage, layoutKey, renderScale } from '../capture/capture';
+import { capturePage, documentSize, layoutKey, renderScale } from '../capture/capture';
 import { inkParams } from '../gl/params';
 import { InkRenderer, type InkFrame, type InkSource } from '../gl/renderer';
 import { applyTheme, getTheme, otherTheme, type Theme } from './theme';
@@ -12,10 +12,14 @@ export interface Point {
 }
 
 const EASE = 'power3.out';
-const FADE_OUT = 0.15;
+const FADE_OUT = 0.35;
 const RESIZE_DEBOUNCE_MS = 250;
+const SCROLL_IDLE_MS = 300;
+const IDLE_FALLBACK_MS = 200;
+const IDLE_TIMEOUT_MS = 1500;
 const ROUTE_CAPTURE_DELAY_MS = 320;
 const IMAGE_WAIT_TIMEOUT_MS = 1500;
+const RESIZE_THRESHOLD_PX = 2;
 /** CSS cross-fade used without WebGL2, with reduced motion, or before snapshots are ready. */
 const CSS_FADE_S = 0.45;
 
@@ -40,13 +44,19 @@ const REPLAY_HOLD_MS = 400;
 
 type ActiveFrame = Omit<InkFrame, 'progress' | 'radius' | 'time' | 'cleanup'>;
 
+type IdleHandle =
+  | { type: 'idle'; id: number }
+  | { type: 'timeout'; id: number };
+
 /**
  * Orchestrates the theme transition:
- *  1. keeps fresh snapshots of both themes on the GPU (pre-captured, re-captured on layout change)
- *  2. on toggle, covers the page with the "from" image, flips the live DOM underneath,
- *     spreads the ink, then fades the overlay away onto the already-flipped page
+ *  1. keeps fresh snapshots of both themes on the GPU (pre-captured during idle time)
+ *  2. on toggle, pauses all live page animations, covers the page with the "from" image,
+ *     flips the live DOM underneath, spreads the ink, then fades the overlay away (0.35s)
+ *     and resumes live animations only after the fade completes
  *  3. if toggled mid-spread, freezes the frame on screen and spreads the next ink over it
- *  4. falls back to a CSS colour cross-fade without WebGL2 or with reduced motion
+ *  4. falls back to a CSS colour cross-fade without WebGL2, with reduced motion, or before
+ *     snapshots are ready
  */
 export class InkTransition {
   private readonly renderer: InkRenderer | null;
@@ -63,10 +73,19 @@ export class InkTransition {
   private captureGen = 0;
   private capturing = false;
   private captureQueued = false;
-  private resizeTimer = 0;
+  private scheduleTimer = 0;
+  private idleHandle: IdleHandle | null = null;
+  private lastScrollAt = 0;
+  private lastCapturedSize = documentSize();
   private destroyed = false;
 
+  private animationsPaused = false;
+  private pausedWebAnims: Animation[] = [];
+  private pausedSvgs: SVGSVGElement[] = [];
+
   private readonly onResize: () => void;
+  private readonly onScroll: () => void;
+  private readonly onVisibilityChange: () => void;
   private readonly onReducedMotionChange: () => void;
   private readonly resizeObserver: ResizeObserver | null = null;
 
@@ -78,7 +97,22 @@ export class InkTransition {
     this.onResize = () => {
       this.renderer?.resize(renderScale());
       if (this.frame) this.draw();
-      this.scheduleCapture(RESIZE_DEBOUNCE_MS);
+      if (this.hasSignificantSizeChange()) {
+        this.scheduleCapture(RESIZE_DEBOUNCE_MS);
+      }
+    };
+    this.onScroll = () => {
+      this.lastScrollAt = performance.now();
+      // Defer any pending idle capture until 300ms after scrolling stops.
+      if (this.idleHandle || this.scheduleTimer) {
+        this.cancelScheduledCapture();
+        this.scheduleCapture(SCROLL_IDLE_MS);
+      }
+    };
+    this.onVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && this.captureQueued) {
+        this.scheduleCapture(0);
+      }
     };
     this.onReducedMotionChange = () => this.scheduleCapture(0);
 
@@ -96,14 +130,22 @@ export class InkTransition {
     );
 
     window.addEventListener('resize', this.onResize);
-    // Catches document-height changes that aren't window resizes (late fonts, images).
-    this.resizeObserver = new ResizeObserver(() => this.scheduleCapture(RESIZE_DEBOUNCE_MS));
+    window.addEventListener('scroll', this.onScroll, { passive: true });
+    document.addEventListener('visibilitychange', this.onVisibilityChange);
+    // Ignore sub-2px layout jitter from ResizeObserver; never recapture for < 2px changes.
+    this.resizeObserver = new ResizeObserver(() => {
+      if (!this.hasSignificantSizeChange()) return;
+      this.captureQueued = true;
+    });
     this.resizeObserver.observe(document.body);
     // Snapshots are skipped under reduced motion; take them if the preference is lifted.
     reducedMotion.addEventListener('change', this.onReducedMotionChange);
 
     void waitForAssetsReady().then(() => {
-      if (!this.destroyed) this.scheduleCapture(0);
+      if (!this.destroyed) {
+        this.lastCapturedSize = documentSize();
+        this.scheduleCapture(0);
+      }
     });
   }
 
@@ -126,7 +168,7 @@ export class InkTransition {
   invalidate(): void {
     if (this.destroyed) return;
     window.clearTimeout(this.replayTimer);
-    window.clearTimeout(this.resizeTimer);
+    this.cancelScheduledCapture();
     this.cancel();
     const gen = ++this.captureGen;
     this.captureQueued = false;
@@ -136,6 +178,7 @@ export class InkTransition {
 
     void waitForAssetsReady().then(() => {
       if (this.destroyed || gen !== this.captureGen) return;
+      this.lastCapturedSize = documentSize();
       this.scheduleCapture(ROUTE_CAPTURE_DELAY_MS);
     });
   }
@@ -145,11 +188,14 @@ export class InkTransition {
     this.destroyed = true;
     this.captureGen++;
     window.clearTimeout(this.replayTimer);
-    window.clearTimeout(this.resizeTimer);
     window.clearTimeout(this.cssFadeTimer);
+    this.cancelScheduledCapture();
     this.cancel();
+    this.resumePageAnimations();
     this.icon?.kill();
     window.removeEventListener('resize', this.onResize);
+    window.removeEventListener('scroll', this.onScroll);
+    document.removeEventListener('visibilitychange', this.onVisibilityChange);
     reducedMotion.removeEventListener('change', this.onReducedMotionChange);
     this.resizeObserver?.disconnect();
   }
@@ -177,9 +223,14 @@ export class InkTransition {
     if (!canAnimate || !renderer) {
       this.cancel();
       this.crossFade(to);
-      if (renderer && !reducedMotion.matches) this.scheduleCapture(0);
       return;
     }
+
+    // Never let a queued idle capture run while transitioning.
+    this.cancelScheduledCapture();
+
+    // Pause all live page animations the moment the ink starts (idempotent on double-click).
+    this.pausePageAnimations();
 
     // Interrupted: freeze exactly what is on screen and spread the new ink over it.
     let from: InkSource = getTheme();
@@ -288,15 +339,99 @@ export class InkTransition {
     this.fade = null;
     this.frame = null;
     this.renderer?.canvas.classList.remove('is-active');
-    if (this.captureQueued) this.scheduleCapture(0);
+    // Resume all paused live animations only AFTER the 0.35s fade-out completes.
+    this.resumePageAnimations();
+    // Refresh snapshots after theme change completion if needed or queued.
+    if (!this.destroyed && this.renderer && !reducedMotion.matches) {
+      const key = layoutKey(renderScale());
+      const needsCapture =
+        this.captureQueued ||
+        !this.renderer.hasValid('light', key) ||
+        !this.renderer.hasValid('dark', key);
+      if (needsCapture) {
+        this.scheduleCapture(0);
+      }
+    }
   }
 
   private cancel(): void {
-    if (!this.frame) return;
+    if (!this.frame) {
+      this.resumePageAnimations();
+      return;
+    }
     this.tween?.kill();
     this.fade?.kill();
     this.tween = null;
     this.hide();
+  }
+
+  // ---------- Live animation pause / resume ----------
+
+  private pausePageAnimations(): void {
+    if (this.animationsPaused) return;
+    this.animationsPaused = true;
+    document.documentElement.dataset.themeTransitioning = 'true';
+    window.dispatchEvent(new CustomEvent('theme-transitioning', { detail: { active: true } }));
+
+    // 1. CSS & Web Animations API (skip live navbar/grain and already-paused animations)
+    const webAnims: Animation[] = [];
+    if (typeof document.getAnimations === 'function') {
+      for (const anim of document.getAnimations()) {
+        if (anim.playState !== 'running') continue;
+        const target = (anim.effect as KeyframeEffect | null)?.target;
+        if (target instanceof Element && target.closest('[data-ink-live]')) continue;
+        try {
+          anim.pause();
+          webAnims.push(anim);
+        } catch {
+          // Ignore non-pausable animation instances
+        }
+      }
+    }
+    this.pausedWebAnims = webAnims;
+
+    // 2. SVG SMIL animations (skip live navbar/toggle SVGs and already-paused SVGs)
+    const svgs: SVGSVGElement[] = [];
+    document.querySelectorAll<SVGSVGElement>('svg').forEach((svg) => {
+      if (svg.closest('[data-ink-live]')) return;
+      if (typeof svg.pauseAnimations !== 'function') return;
+      try {
+        if (typeof svg.animationsPaused === 'function' && svg.animationsPaused()) return;
+        svg.pauseAnimations();
+        svgs.push(svg);
+      } catch {
+        // Ignore SMIL control errors on unsupported browsers
+      }
+    });
+    this.pausedSvgs = svgs;
+  }
+
+  private resumePageAnimations(): void {
+    if (!this.animationsPaused) return;
+    this.animationsPaused = false;
+    delete document.documentElement.dataset.themeTransitioning;
+
+    for (const anim of this.pausedWebAnims) {
+      try {
+        if (anim.playState === 'paused') anim.play();
+      } catch {
+        // Ignore detached animations
+      }
+    }
+    this.pausedWebAnims = [];
+
+    for (const svg of this.pausedSvgs) {
+      try {
+        if (svg.isConnected && typeof svg.unpauseAnimations === 'function') {
+          svg.unpauseAnimations();
+        }
+      } catch {
+        // Ignore detached SVGs
+      }
+    }
+    this.pausedSvgs = [];
+
+    window.dispatchEvent(new CustomEvent('theme-transitioning', { detail: { active: false } }));
   }
 
   /** Plain CSS colour transition (no WebGL2, reduced motion, or snapshots not ready yet). */
@@ -314,7 +449,9 @@ export class InkTransition {
     window.clearTimeout(this.cssFadeTimer);
     this.cssFadeTimer = window.setTimeout(() => {
       root.classList.remove('theme-fade');
-      if (this.captureQueued) this.scheduleCapture(0);
+      if (!this.destroyed && this.renderer && !reducedMotion.matches) {
+        this.scheduleCapture(0);
+      }
     }, CSS_FADE_S * 1000 + 50);
   }
 
@@ -338,19 +475,84 @@ export class InkTransition {
 
   // ---------- Capture scheduling ----------
 
+  private hasSignificantSizeChange(): boolean {
+    const next = documentSize();
+    const dw = Math.abs(next.width - this.lastCapturedSize.width);
+    const dh = Math.abs(next.height - this.lastCapturedSize.height);
+    return dw >= RESIZE_THRESHOLD_PX || dh >= RESIZE_THRESHOLD_PX;
+  }
+
+  private cancelScheduledCapture(): void {
+    window.clearTimeout(this.scheduleTimer);
+    this.scheduleTimer = 0;
+    if (this.idleHandle) {
+      if (this.idleHandle.type === 'idle' && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(this.idleHandle.id);
+      } else if (this.idleHandle.type === 'timeout') {
+        window.clearTimeout(this.idleHandle.id);
+      }
+      this.idleHandle = null;
+    }
+  }
+
   private scheduleCapture(delay: number): void {
-    if (this.destroyed) return;
-    window.clearTimeout(this.resizeTimer);
-    this.resizeTimer = window.setTimeout(() => void this.captureAll(), delay);
+    if (this.destroyed || !this.renderer || reducedMotion.matches) return;
+    this.cancelScheduledCapture();
+
+    const enqueueIdle = () => {
+      this.scheduleTimer = 0;
+      if (this.destroyed) return;
+      if (typeof window.requestIdleCallback === 'function') {
+        const id = window.requestIdleCallback(
+          () => {
+            this.idleHandle = null;
+            void this.captureAll();
+          },
+          { timeout: IDLE_TIMEOUT_MS },
+        );
+        this.idleHandle = { type: 'idle', id };
+      } else {
+        const id = window.setTimeout(() => {
+          this.idleHandle = null;
+          void this.captureAll();
+        }, IDLE_FALLBACK_MS);
+        this.idleHandle = { type: 'timeout', id };
+      }
+    };
+
+    if (delay > 0) {
+      this.scheduleTimer = window.setTimeout(enqueueIdle, delay);
+    } else {
+      enqueueIdle();
+    }
   }
 
   private async captureAll(): Promise<void> {
     const renderer = this.renderer;
     if (this.destroyed || !renderer || renderer.isLost || reducedMotion.matches) return;
 
+    // Never capture while the tab/page is hidden.
+    if (document.visibilityState !== 'visible') {
+      this.captureQueued = true;
+      return;
+    }
+
+    // Never capture while the user is scrolling; wait 300ms after the last scroll event.
+    const sinceScroll = performance.now() - this.lastScrollAt;
+    if (this.lastScrollAt > 0 && sinceScroll < SCROLL_IDLE_MS) {
+      this.captureQueued = true;
+      this.scheduleCapture(Math.ceil(SCROLL_IDLE_MS - sinceScroll));
+      return;
+    }
+
     // Capturing blocks the main thread; never do it mid-animation (or mid CSS fade, which
     // would bake half-transitioned colours into the snapshot).
-    if (this.capturing || this.frame || document.documentElement.classList.contains('theme-fade')) {
+    if (
+      this.capturing ||
+      this.frame ||
+      this.animationsPaused ||
+      document.documentElement.classList.contains('theme-fade')
+    ) {
       this.captureQueued = true;
       return;
     }
@@ -366,6 +568,22 @@ export class InkTransition {
     this.capturing = true;
     try {
       for (const theme of themes) {
+        // Re-check visibility, scroll, and transition state before capturing the second theme.
+        if (
+          this.destroyed ||
+          gen !== this.captureGen ||
+          document.visibilityState !== 'visible' ||
+          this.frame ||
+          this.animationsPaused
+        ) {
+          this.captureQueued = true;
+          return;
+        }
+        if (this.lastScrollAt > 0 && performance.now() - this.lastScrollAt < SCROLL_IDLE_MS) {
+          this.captureQueued = true;
+          return;
+        }
+
         const snap = await capturePage(theme, scale, renderer.maxTextureSize);
         if (this.destroyed || gen !== this.captureGen) return;
         if (snap.key !== layoutKey(renderScale())) {
@@ -374,10 +592,16 @@ export class InkTransition {
           break;
         }
         renderer.upload(snap);
+        this.lastCapturedSize = documentSize();
         if (import.meta.env.DEV) {
           console.debug(
             `[ink] captured ${theme} ${snap.canvas.width}×${snap.canvas.height} in ${snap.ms.toFixed(0)}ms`,
           );
+        }
+
+        // Yield between the two theme captures via idle callback / macrotask so input stays responsive.
+        if (themes.length > 1 && theme === themes[0]) {
+          await yieldToIdle();
         }
       }
     } catch (err) {
@@ -385,31 +609,68 @@ export class InkTransition {
     } finally {
       this.capturing = false;
     }
-    if (!this.destroyed && this.captureQueued) this.scheduleCapture(RESIZE_DEBOUNCE_MS);
+    if (!this.destroyed && this.captureQueued) {
+      const wait =
+        this.lastScrollAt > 0
+          ? Math.max(RESIZE_DEBOUNCE_MS, Math.ceil(SCROLL_IDLE_MS - (performance.now() - this.lastScrollAt)))
+          : RESIZE_DEBOUNCE_MS;
+      this.scheduleCapture(wait);
+    }
   }
+}
+
+function yieldToIdle(): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(() => resolve(), { timeout: 400 });
+    } else {
+      window.setTimeout(resolve, 60);
+    }
+  });
 }
 
 async function waitForAssetsReady(): Promise<void> {
   await document.fonts.ready;
-  const pending = Array.from(document.images).filter(
-    (img) => !img.complete && img.loading !== 'lazy',
-  );
+
+  // Warm any same-origin images (including below-the-fold lazy images) so full-document
+  // snapshots include every product and portrait image cleanly.
+  const urls = new Set<string>();
+  const pending: Promise<void>[] = [];
+
+  for (const img of Array.from(document.images)) {
+    const src = img.currentSrc || img.getAttribute('src') || '';
+    if (!src || src.startsWith('data:')) continue;
+    if (img.complete && img.naturalWidth > 0) continue;
+
+    if (img.loading === 'lazy') {
+      if (urls.has(src)) continue;
+      urls.add(src);
+      pending.push(
+        new Promise<void>((resolve) => {
+          const probe = new Image();
+          probe.onload = () => resolve();
+          probe.onerror = () => resolve();
+          probe.src = src;
+        }),
+      );
+    } else {
+      pending.push(
+        new Promise<void>((resolve) => {
+          const done = () => {
+            img.removeEventListener('load', done);
+            img.removeEventListener('error', done);
+            resolve();
+          };
+          img.addEventListener('load', done, { once: true });
+          img.addEventListener('error', done, { once: true });
+        }),
+      );
+    }
+  }
+
   if (pending.length === 0) return;
   await Promise.race([
-    Promise.all(
-      pending.map(
-        (img) =>
-          new Promise<void>((resolve) => {
-            const done = () => {
-              img.removeEventListener('load', done);
-              img.removeEventListener('error', done);
-              resolve();
-            };
-            img.addEventListener('load', done, { once: true });
-            img.addEventListener('error', done, { once: true });
-          }),
-      ),
-    ),
+    Promise.all(pending),
     new Promise<void>((resolve) => window.setTimeout(resolve, IMAGE_WAIT_TIMEOUT_MS)),
   ]);
 }

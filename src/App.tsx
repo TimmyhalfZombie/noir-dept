@@ -58,6 +58,7 @@ function AnimatedRoutes() {
   return (
     <AnimatePresence mode="wait">
       <motion.main
+        data-reveal=""
         id="main-content"
         tabIndex={-1}
         key={location.pathname}

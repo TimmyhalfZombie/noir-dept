@@ -48,21 +48,28 @@ export function useMotionVisibility({
   const isPaused = !isVisible || reducedMotion;
 
   useEffect(() => {
-    for (const ref of svgRefs) {
-      const svg = ref.current;
-      if (!svg) continue;
-      try {
-        if (isPaused) {
-          if (typeof svg.pauseAnimations === 'function') {
-            svg.pauseAnimations();
+    const sync = () => {
+      const transitioning = document.documentElement.dataset.themeTransitioning === 'true';
+      for (const ref of svgRefs) {
+        const svg = ref.current;
+        if (!svg) continue;
+        try {
+          if (isPaused || transitioning) {
+            if (typeof svg.pauseAnimations === 'function') {
+              svg.pauseAnimations();
+            }
+          } else if (typeof svg.unpauseAnimations === 'function') {
+            svg.unpauseAnimations();
           }
-        } else if (typeof svg.unpauseAnimations === 'function') {
-          svg.unpauseAnimations();
+        } catch {
+          // Ignore SMIL control errors on unsupported browsers
         }
-      } catch {
-        // Ignore SMIL control errors on unsupported browsers
       }
-    }
+    };
+
+    sync();
+    window.addEventListener('theme-transitioning', sync);
+    return () => window.removeEventListener('theme-transitioning', sync);
   }, [isPaused, svgRefs]);
 
   return { isVisible, hasEntered, reducedMotion, isPaused };

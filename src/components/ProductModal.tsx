@@ -7,7 +7,7 @@ import {
   getProductImageAlt,
   type Product,
 } from '../data/products';
-import { getTheme, type Theme } from '../ui/theme';
+import { getTheme } from '../ui/theme';
 import { Button } from './Button';
 import { FourPointStar } from './Motifs';
 
@@ -19,18 +19,9 @@ interface ProductModalProps {
 type ViewSide = 'front' | 'back';
 
 export function ProductModal({ product, onClose }: ProductModalProps) {
-  const [theme, setTheme] = useState<Theme>(() => getTheme());
   const [activeSide, setActiveSide] = useState<ViewSide>('front');
   const [frontError, setFrontError] = useState(false);
   const [backError, setBackError] = useState(false);
-
-  useEffect(() => {
-    const onThemeChange = (e: Event) => {
-      setTheme((e as CustomEvent<Theme>).detail ?? getTheme());
-    };
-    window.addEventListener('noir-theme-change', onThemeChange);
-    return () => window.removeEventListener('noir-theme-change', onThemeChange);
-  }, []);
 
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -103,18 +94,15 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
   }, [product, onClose]);
 
   const isSold = product?.status === 'SOLD';
-  const imageFilter = isSold
-    ? 'grayscale(100%)'
-    : 'grayscale(15%) contrast(1.02)';
 
   const frontSrc = product
     ? frontError
-      ? getFallbackPlaceholder('Front', theme)
+      ? getFallbackPlaceholder('Front', getTheme())
       : product.frontImage
     : '';
   const backSrc = product
     ? backError
-      ? getFallbackPlaceholder('Back', theme)
+      ? getFallbackPlaceholder('Back', getTheme())
       : product.backImage
     : '';
 
@@ -188,16 +176,13 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
                   className="relative aspect-square w-full bg-charcoal border border-charcoal overflow-hidden select-none"
                 >
                   <img
-                    data-ink-live
                     src={frontSrc}
                     alt={getProductImageAlt(product, 'front')}
                     width={800}
                     height={800}
                     loading="lazy"
                     decoding="async"
-                    referrerPolicy="no-referrer"
                     onError={() => setFrontError(true)}
-                    style={{ filter: imageFilter }}
                     className={`h-full w-full object-cover transition-opacity duration-500 ease-out ${
                       activeSide === 'front'
                         ? isSold
@@ -207,16 +192,13 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
                     }`}
                   />
                   <img
-                    data-ink-live
                     src={backSrc}
                     alt={getProductImageAlt(product, 'back')}
                     width={800}
                     height={800}
                     loading="lazy"
                     decoding="async"
-                    referrerPolicy="no-referrer"
                     onError={() => setBackError(true)}
-                    style={{ filter: imageFilter }}
                     className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ease-out ${
                       activeSide === 'back'
                         ? isSold
@@ -282,15 +264,12 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
                         }`}
                       >
                         <img
-                          data-ink-live
                           src={thumb.src}
                           alt={getProductImageAlt(product, thumb.side)}
                           width={400}
                           height={400}
                           loading="lazy"
                           decoding="async"
-                          referrerPolicy="no-referrer"
-                          style={{ filter: imageFilter }}
                           className={`h-full w-full object-cover transition-opacity duration-200 ${
                             selected ? 'opacity-100' : 'opacity-65 hover:opacity-85'
                           }`}

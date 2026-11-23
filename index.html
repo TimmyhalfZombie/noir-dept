@@ -62,6 +62,7 @@
     <script>
       (function () {
         try {
+          localStorage.removeItem('noir-dept-theme');
           var saved = localStorage.getItem('noir-theme');
           var theme =
             saved === 'light' || saved === 'dark'

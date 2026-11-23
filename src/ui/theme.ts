@@ -32,10 +32,9 @@ export function applyTheme(theme: Theme, toggle?: HTMLButtonElement | null): voi
   }
 
   try {
+    window.localStorage.removeItem('noir-dept-theme');
     window.localStorage.setItem(STORAGE_KEY, theme);
   } catch {
     // Ignore storage access errors in restricted contexts
   }
-
-  window.dispatchEvent(new CustomEvent<Theme>('noir-theme-change', { detail: theme }));
 }
