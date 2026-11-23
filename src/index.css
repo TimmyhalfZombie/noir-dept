@@ -1,0 +1,110 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --noir: #F2F1EC;
+  --charcoal: #D4D3CC;
+  --stone: #686864;
+  --steel: #4A4A47;
+  --ivory: #0D0D0D;
+}
+
+.dark {
+  --noir: #0D0D0D;
+  --charcoal: #2F2F2F;
+  --stone: #6B6B6B;
+  --steel: #8A8A8A;
+  --ivory: #E5E5E1;
+}
+
+@theme inline {
+  --color-noir: var(--noir);
+  --color-charcoal: var(--charcoal);
+  --color-stone: var(--stone);
+  --color-steel: var(--steel);
+  --color-ivory: var(--ivory);
+
+  --font-serif: "Playfair Display", Georgia, "Times New Roman", serif;
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+}
+
+@layer base {
+  html {
+    background-color: var(--noir);
+    color: var(--ivory);
+    font-family: var(--font-sans);
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--noir);
+    color: var(--ivory);
+    overflow-x: hidden;
+    letter-spacing: 0.01em;
+    transition: background-color 200ms ease, color 200ms ease;
+  }
+
+  h1, h2, h3, .font-editorial {
+    font-family: var(--font-serif);
+    text-wrap: balance;
+  }
+
+  :focus-visible {
+    outline: 1px solid var(--ivory);
+    outline-offset: 3px;
+  }
+}
+
+/* Subtle distressed print / film grain overlay */
+.noir-grain {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 240 240' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 220px 220px;
+}
+
+@keyframes orbit-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes orbit-spin-reverse {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+.animate-orbit-slow {
+  animation: orbit-spin 54s linear infinite;
+}
+
+.animate-orbit-reverse {
+  animation: orbit-spin-reverse 72s linear infinite;
+}
+
+.ring-spin {
+  transform-origin: 0px 0px;
+  animation: orbit-spin 60s linear infinite;
+  will-change: transform;
+}
+
+.ring-paused .ring-spin {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .animate-orbit-slow,
+  .animate-orbit-reverse,
+  .ring-spin {
+    animation: none !important;
+  }
+}
