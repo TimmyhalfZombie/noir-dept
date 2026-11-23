@@ -93,7 +93,7 @@ export const products: Product[] = [
     size: 'L',
     condition: 'Very Good',
     conditionNote: 'Light fading on the cuffs.',
-    price: '₱38,000',
+    price: '₱1,000',
     status: 'AVAILABLE',
     measurements: {
       pitToPit: '24"',
@@ -111,7 +111,7 @@ export const products: Product[] = [
     size: 'M',
     condition: 'Excellent',
     conditionNote: 'No visible flaws.',
-    price: '₱3,200',
+    price: '₱750',
     status: 'AVAILABLE',
     measurements: {
       pitToPit: '23"',
@@ -129,7 +129,7 @@ export const products: Product[] = [
     size: 'XL',
     condition: 'Good',
     conditionNote: 'Some pilling, small mark near the hem.',
-    price: '₱2,400',
+    price: '₱650',
     status: 'AVAILABLE',
     measurements: {
       pitToPit: '26"',
@@ -147,7 +147,7 @@ export const products: Product[] = [
     size: 'M',
     condition: 'Very Good',
     conditionNote: 'Zip works fine, light wear on the drawcords.',
-    price: '₱14,500',
+    price: '₱950',
     status: 'RESERVED',
     measurements: {
       pitToPit: '21.5"',
@@ -165,7 +165,7 @@ export const products: Product[] = [
     size: 'L',
     condition: 'Good',
     conditionNote: 'Even fade throughout.',
-    price: '₱3,800',
+    price: '₱800',
     status: 'AVAILABLE',
     measurements: {
       pitToPit: '23.5"',
@@ -183,7 +183,7 @@ export const products: Product[] = [
     size: 'S',
     condition: 'Very Good',
     conditionNote: 'Slight cracking on the print.',
-    price: '₱4,200',
+    price: '₱850',
     status: 'SOLD',
     measurements: {
       pitToPit: '21.5"',

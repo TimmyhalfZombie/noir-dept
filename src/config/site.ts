@@ -1,5 +1,5 @@
 export const site = {
-  siteUrl: 'https://www.noirdept.com', // Replace with your real domain
+  siteUrl: 'https://noirdept.ai.studio', // Live domain: og:image, canonical, sitemap use it
   name: 'NOIR DEPT.',
   tagline: 'Streetwear • Rare Finds',
   slogan: 'Wear the past. Keep the style.',

@@ -171,7 +171,7 @@ export function HomePage() {
           {filteredProducts.length > 0 ? (
             <div className="mt-10 sm:mt-12 grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
               {filteredProducts.map((product, index) => (
-                <Reveal key={product.id} delay={Math.min(index * 0.05, 0.2)}>
+                <Reveal key={product.id} delay={Math.min(index * 0.05, 0.2)} className="h-full">
                   <ProductCard product={product} onSelect={setSelectedProduct} />
                 </Reveal>
               ))}

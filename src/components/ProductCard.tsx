@@ -34,7 +34,7 @@ export function ProductCard({ product, onSelect }: ProductCardProps) {
       : 'text-stone line-through';
 
   return (
-    <article className="group relative flex flex-col bg-noir border border-charcoal hover:border-ivory has-[.card-trigger:focus-visible]:outline-1 has-[.card-trigger:focus-visible]:outline-ivory has-[.card-trigger:focus-visible]:outline-offset-2 transition-colors duration-200">
+    <article className="group relative flex h-full flex-col bg-noir border border-charcoal hover:border-ivory has-[.card-trigger:focus-visible]:outline-1 has-[.card-trigger:focus-visible]:outline-ivory has-[.card-trigger:focus-visible]:outline-offset-2 transition-colors duration-200">
       {/* Square photo container */}
       <div className="relative aspect-square w-full overflow-hidden bg-charcoal border-b border-charcoal">
         {/* Front image */}
@@ -106,7 +106,8 @@ export function ProductCard({ product, onSelect }: ProductCardProps) {
             </span>
           </div>
 
-          <h3 className="font-serif text-lg sm:text-xl font-semibold tracking-[-0.01em] text-ivory leading-snug">
+          {/* Two lines reserved for every name, so all cards are the same height */}
+          <h3 className="font-serif text-lg sm:text-xl font-semibold tracking-[-0.01em] text-ivory leading-snug min-h-[2lh]">
             <button
               type="button"
               onClick={() => onSelect(product)}
