@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { seoRoutes } from '../config/site';
 import { siteConfig } from '../config/siteConfig';
 import { buildBreadcrumbSchema } from '../lib/schema';
@@ -9,13 +9,11 @@ import { Reveal } from '../components/Reveal';
 import { SectionHeader } from '../components/SectionHeader';
 import { Seo } from '../components/Seo';
 import { EclipseBg } from '../components/motion/EclipseBg';
-import { OrbitFrame } from '../components/motion/OrbitFrame';
+import { FounderOrbitPortrait } from '../components/motion/FounderOrbitPortrait';
 import { StitchDivider } from '../components/motion/StitchDivider';
 
 export function AboutPage() {
-  const [portraitFailed, setPortraitFailed] = useState(false);
   const { founder } = siteConfig.about;
-  const showPortraitImage = Boolean(founder.portraitSrc) && !portraitFailed;
 
   const breadcrumbSchema = useMemo(
     () =>
@@ -74,40 +72,12 @@ export function AboutPage() {
 
       <StitchDivider />
 
-      {/* 3. From the Founder: two-column portrait with OrbitFrame + copy */}
+      {/* 3. From the Founder: two-column woven-label portrait with stitched orbit + copy */}
       <section className="py-20 sm:py-24 md:py-32 overflow-x-clip">
         <div className="max-w-7xl mx-auto px-5 sm:px-8 grid grid-cols-1 lg:grid-cols-12 gap-14 lg:gap-16 items-center">
-          {/* Left: 4:5 portrait wrapped in OrbitFrame (simple placeholder, no stock photo) */}
+          {/* Left: 4:5 portrait in the woven-label frame; the orbit wraps around it */}
           <Reveal className="lg:col-span-5 w-full">
-            <OrbitFrame>
-              <div className="relative aspect-[4/5] w-full overflow-hidden bg-charcoal border border-charcoal">
-                {/* Top-right four-point star marker */}
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute top-4 right-4 z-10 text-stone"
-                >
-                  <FourPointStar className="w-3.5 h-3.5" />
-                </div>
-
-                {showPortraitImage ? (
-                  <img
-                    src={founder.portraitSrc}
-                    alt={founder.portraitAlt}
-                    width={1000}
-                    height={1250}
-                    loading="lazy"
-                    decoding="async"
-                    onError={() => setPortraitFailed(true)}
-                    className="founder-portrait-img h-full w-full object-cover object-[center_25%]"
-                  />
-                ) : (
-                  <div
-                    aria-label="Founder portrait placeholder"
-                    className="h-full w-full bg-charcoal"
-                  />
-                )}
-              </div>
-            </OrbitFrame>
+            <FounderOrbitPortrait src={founder.portraitSrc} alt={founder.portraitAlt} />
           </Reveal>
 
           {/* Right: Label, body copy, italic serif signature */}

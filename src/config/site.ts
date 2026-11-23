@@ -9,7 +9,7 @@ export const site = {
   locale: 'en_PH',
   themeColor: '#0D0D0D',
   ogImage: '/og-image.jpg',
-  ogImageAlt: 'NOIR DEPT. — Streetwear • Rare Finds',
+  ogImageAlt: 'NOIR DEPT.',
   logo: '/icon-512.png',
   lastUpdated: '2026-11-22',
   lastUpdatedDisplay: 'November 22, 2026',
@@ -26,34 +26,34 @@ export interface SeoRouteConfig {
 export const seoRoutes = {
   home: {
     path: '/',
-    title: 'NOIR DEPT. — Streetwear • Rare Finds',
+    title: 'NOIR DEPT.',
     description:
       'Secondhand branded streetwear with real photos and honest condition. New drops posted on Facebook.',
     changefreq: 'weekly',
   },
   about: {
     path: '/about',
-    title: 'About — NOIR DEPT.',
+    title: 'About - NOIR DEPT.',
     description:
       'An independent shop for secondhand branded streetwear. Fewer pieces, picked with care.',
     changefreq: 'monthly',
   },
   services: {
     path: '/services',
-    title: 'How We Work — NOIR DEPT.',
+    title: 'How We Work - NOIR DEPT.',
     description:
       'Drops, item inquiries, condition reports, sourcing requests and how to buy from NOIR DEPT.',
     changefreq: 'monthly',
   },
   privacy: {
     path: '/privacy',
-    title: 'Privacy — NOIR DEPT.',
+    title: 'Privacy - NOIR DEPT.',
     description: 'How NOIR DEPT. handles your information.',
     changefreq: 'monthly',
   },
   notFound: {
     path: '/404',
-    title: 'Page Not Found — NOIR DEPT.',
+    title: 'Page Not Found - NOIR DEPT.',
     description: "This page doesn't exist, or it's sold out.",
     noindex: true,
   },
