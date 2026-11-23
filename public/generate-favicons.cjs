@@ -23,10 +23,12 @@ const OUT = __dirname;
 const DARK = '#0D0D0D';
 const LIGHT = '#E5E5E1';
 
-// ---- Geometry (64×64 viewBox) ----
+// ---- Geometry (64-unit space; the output viewBox is cropped around it) ----
 const GLOBE = { cx: 32, cy: 32, r: 15 };
-const RING = { cx: 32, cy: 32, rx: 26, ry: 8, rotate: -20 };
-const STAR = { cx: 50, cy: 13, halfH: 8, halfW: 6, inset: 1.5 }; // 16 tall; inset = concavity
+// The ring is the widest part and sets the icon's scale: kept close to the globe so the
+// globe can be drawn as large as possible in a 16px tab.
+const RING = { cx: 32, cy: 32, rx: 22, ry: 7.5, rotate: -20 };
+const STAR = { cx: 46.5, cy: 15.5, halfH: 6.5, halfW: 5, inset: 1.2 }; // 13 tall; inset = concavity
 const STROKE = 3.5;
 /** Gap cut around a shape where another passes in front of it (each side). */
 const GAP = 1.5;
@@ -76,7 +78,16 @@ function artwork({ stroke = STROKE, strokeAttr, fillAttr, idPrefix = '' }) {
 }
 
 // ---- favicon.svg: transparent, colour follows the browser's light/dark scheme ----
-const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+/**
+ * Square viewBox centred on the globe (the icon's visual centre, so it doesn't sit low next
+ * to the tab title), just large enough to hold the whole artwork plus a small margin.
+ */
+function tightViewBox(margin = 0.5) {
+  const half = halfExtentFromGlobe(STROKE) + margin;
+  return [GLOBE.cx - half, GLOBE.cy - half, half * 2, half * 2].map((v) => +v.toFixed(2)).join(' ');
+}
+
+const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${tightViewBox()}">
   <style>
     .stroke { fill: none; stroke: ${DARK}; }
     .fill { fill: ${DARK}; }
@@ -88,7 +99,7 @@ const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"
 </svg>
 `;
 
-// ---- Badge (PNG/ICO source): solid #0D0D0D square, icon in #E5E5E1 with ~14% padding ----
+// ---- Badge (PNG/ICO source): solid #0D0D0D square, icon in #E5E5E1 with ~8% padding ----
 /** Bounding box of the artwork (incl. stroke) in 64-unit space, used to centre and scale it. */
 function artworkBounds(stroke) {
   const t = (RING.rotate * Math.PI) / 180;
@@ -101,12 +112,23 @@ function artworkBounds(stroke) {
   return { x0, y0, w: x1 - x0, h: y1 - y0 };
 }
 
-function badgeSvg(size, { stroke = STROKE, rounded = true } = {}) {
-  const PAD = 0.14;
+/** Largest distance from the globe's centre to any edge of the artwork. */
+function halfExtentFromGlobe(stroke) {
   const box = artworkBounds(stroke);
-  const scale = (size * (1 - PAD * 2)) / Math.max(box.w, box.h);
-  const tx = size / 2 - (box.x0 + box.w / 2) * scale;
-  const ty = size / 2 - (box.y0 + box.h / 2) * scale;
+  return Math.max(
+    GLOBE.cx - box.x0,
+    box.x0 + box.w - GLOBE.cx,
+    GLOBE.cy - box.y0,
+    box.y0 + box.h - GLOBE.cy,
+  );
+}
+
+function badgeSvg(size, { stroke = STROKE, rounded = true } = {}) {
+  const PAD = 0.08; // padding each side, as a fraction of the badge size
+  // Centred on the globe, like favicon.svg.
+  const scale = (size * (1 - PAD * 2)) / (halfExtentFromGlobe(stroke) * 2);
+  const tx = size / 2 - GLOBE.cx * scale;
+  const ty = size / 2 - GLOBE.cy * scale;
   const radius = rounded ? size * 0.22 : 0;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
   <rect width="${size}" height="${size}" rx="${radius}" fill="${DARK}"/>

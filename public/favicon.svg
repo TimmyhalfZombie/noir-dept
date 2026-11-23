@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="8.5 8.5 47 47">
   <style>
     .stroke { fill: none; stroke: #0D0D0D; }
     .fill { fill: #0D0D0D; }
@@ -11,19 +11,19 @@
     <mask id="ring-back" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
       <rect width="64" height="64" fill="#fff"/>
       <circle cx="32" cy="32" r="15" fill="#000"/>
-      <path d="M50 5Q51.5 11.5 56 13Q51.5 14.5 50 21Q48.5 14.5 44 13Q48.5 11.5 50 5Z" fill="#000" stroke="#000" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M46.5 9Q47.7 14.3 51.5 15.5Q47.7 16.7 46.5 22Q45.3 16.7 41.5 15.5Q45.3 14.3 46.5 9Z" fill="#000" stroke="#000" stroke-width="3" stroke-linejoin="round"/>
     </mask>
     <mask id="globe-gap" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
       <rect width="64" height="64" fill="#fff"/>
-      <path d="M58 32A26 8 0 0 1 6 32" transform="rotate(-20 32 32)" fill="none" stroke="#000" stroke-width="6.5" stroke-linecap="round"/>
+      <path d="M54 32A22 7.5 0 0 1 10 32" transform="rotate(-20 32 32)" fill="none" stroke="#000" stroke-width="6.5" stroke-linecap="round"/>
     </mask>
   </defs>
   <g mask="url(#ring-back)">
-    <path class="stroke" d="M6 32A26 8 0 0 1 58 32" transform="rotate(-20 32 32)" stroke-width="3.5" stroke-linecap="round"/>
+    <path class="stroke" d="M10 32A22 7.5 0 0 1 54 32" transform="rotate(-20 32 32)" stroke-width="3.5" stroke-linecap="round"/>
   </g>
   <g mask="url(#globe-gap)">
     <circle class="stroke" cx="32" cy="32" r="15" stroke-width="3.5" stroke-linecap="round"/>
   </g>
-  <path class="stroke" d="M58 32A26 8 0 0 1 6 32" transform="rotate(-20 32 32)" stroke-width="3.5" stroke-linecap="round"/>
-  <path class="fill" d="M50 5Q51.5 11.5 56 13Q51.5 14.5 50 21Q48.5 14.5 44 13Q48.5 11.5 50 5Z"/>
+  <path class="stroke" d="M54 32A22 7.5 0 0 1 10 32" transform="rotate(-20 32 32)" stroke-width="3.5" stroke-linecap="round"/>
+  <path class="fill" d="M46.5 9Q47.7 14.3 51.5 15.5Q47.7 16.7 46.5 22Q45.3 16.7 41.5 15.5Q45.3 14.3 46.5 9Z"/>
 </svg>
