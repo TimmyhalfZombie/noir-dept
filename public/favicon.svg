@@ -1,8 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <rect width="64" height="64" rx="14" fill="#0D0D0D" />
-  <circle cx="32" cy="32" r="22" stroke="#E5E5E1" stroke-width="1.5" />
-  <path
-    d="M32 16L34.7 29.3L48 32L34.7 34.7L32 48L29.3 34.7L16 32L29.3 29.3L32 16Z"
-    fill="#E5E5E1"
-  />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    .stroke { fill: none; stroke: #0D0D0D; }
+    .fill { fill: #0D0D0D; }
+    @media (prefers-color-scheme: dark) {
+      .stroke { stroke: #E5E5E1; }
+      .fill { fill: #E5E5E1; }
+    }
+  </style>
+  <defs>
+    <mask id="ring-back" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+      <rect width="64" height="64" fill="#fff"/>
+      <circle cx="32" cy="32" r="15" fill="#000"/>
+      <path d="M50 5Q51.5 11.5 56 13Q51.5 14.5 50 21Q48.5 14.5 44 13Q48.5 11.5 50 5Z" fill="#000" stroke="#000" stroke-width="3" stroke-linejoin="round"/>
+    </mask>
+    <mask id="globe-gap" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+      <rect width="64" height="64" fill="#fff"/>
+      <path d="M58 32A26 8 0 0 1 6 32" transform="rotate(-20 32 32)" fill="none" stroke="#000" stroke-width="6.5" stroke-linecap="round"/>
+    </mask>
+  </defs>
+  <g mask="url(#ring-back)">
+    <path class="stroke" d="M6 32A26 8 0 0 1 58 32" transform="rotate(-20 32 32)" stroke-width="3.5" stroke-linecap="round"/>
+  </g>
+  <g mask="url(#globe-gap)">
+    <circle class="stroke" cx="32" cy="32" r="15" stroke-width="3.5" stroke-linecap="round"/>
+  </g>
+  <path class="stroke" d="M58 32A26 8 0 0 1 6 32" transform="rotate(-20 32 32)" stroke-width="3.5" stroke-linecap="round"/>
+  <path class="fill" d="M50 5Q51.5 11.5 56 13Q51.5 14.5 50 21Q48.5 14.5 44 13Q48.5 11.5 50 5Z"/>
 </svg>

@@ -5,6 +5,7 @@ import { Menu, X, ArrowUpRight } from 'lucide-react';
 import { siteConfig } from '../config/siteConfig';
 import { getTheme } from '../ui/theme';
 import { Button } from './Button';
+import { NoirLogo } from './NoirLogo';
 import { FourPointStar } from './Motifs';
 
 interface NavbarProps {
@@ -58,12 +59,16 @@ export function Navbar({ toggleButtonRef, onToggleTheme }: NavbarProps) {
         }`}
       >
         <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 md:h-20 flex items-center justify-between gap-8">
-          {/* Zone 1: Single-line brand wordmark */}
+          {/* Zone 1: Stacked NOIR DEPT. logo (drawn in currentColor, so it follows the theme) */}
           <Link
             to="/"
-            className="font-serif text-lg sm:text-xl font-bold tracking-[0.06em] uppercase text-ivory whitespace-nowrap shrink-0 hover:opacity-85 transition-opacity"
+            aria-label={`${siteConfig.brand.name} home`}
+            // While the bar is see-through the logo sits on the ink, so it changes colour when
+            // the ink reaches it; over the opaque bar it switches with the bar.
+            data-ink-follow={scrolled || menuOpen ? undefined : ''}
+            className="shrink-0 text-ivory hover:opacity-85 transition-[color,opacity] duration-300"
           >
-            {siteConfig.brand.name}
+            <NoirLogo height={40} className="block" />
           </Link>
 
           {/* Zone 2: Desktop navigation links */}

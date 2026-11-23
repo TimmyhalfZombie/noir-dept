@@ -134,7 +134,7 @@ export function PlanetriseBg() {
         className="absolute inset-x-0 bottom-0 h-24 sm:h-32"
         style={{
           background:
-            'linear-gradient(to top, var(--noir) 0%, transparent 100%)',
+            'linear-gradient(to top, var(--noir) 0%, var(--noir-clear) 100%)',
         }}
       />
     </div>

@@ -70,17 +70,21 @@ export function HomePage() {
         <div className="relative max-w-7xl mx-auto w-full px-5 sm:px-8 flex flex-col items-center text-center">
           {/* Wordmark + Planetary Ring background */}
           <PlanetaryRing heroRef={heroRef}>
-            <h1 className="relative z-10 font-serif text-[clamp(2.85rem,11.5vw,10rem)] font-bold uppercase tracking-[-0.03em] leading-[0.9] text-ivory whitespace-nowrap px-4 sm:px-6">
+            <h1
+              data-ink-ring-occluder="text"
+              className="relative z-10 font-serif text-[clamp(2.85rem,11.5vw,10rem)] font-bold uppercase tracking-[-0.03em] leading-[0.9] text-ivory whitespace-nowrap px-4 sm:px-6">
               {siteConfig.brand.name}
             </h1>
           </PlanetaryRing>
 
           {/* Descriptor and slogan with subtle solid-background fade so core/ring never collide */}
           <div
+            data-ink-ring-occluder="box"
+            data-ink-ring-occluder-from="0.38"
             className="relative z-20 -mt-2 sm:mt-4 pt-8 pb-2 px-6 w-full max-w-2xl space-y-4"
             style={{
               background:
-                'linear-gradient(to bottom, transparent 0%, var(--noir) 38%, var(--noir) 100%)',
+                'linear-gradient(to bottom, var(--noir-clear) 0%, var(--noir) 38%, var(--noir) 100%)',
             }}
           >
             <p className="text-[11px] sm:text-xs uppercase tracking-[0.32em] text-steel">

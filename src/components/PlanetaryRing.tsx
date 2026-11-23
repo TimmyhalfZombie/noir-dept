@@ -229,7 +229,10 @@ export function PlanetaryRing({ heroRef, children }: PlanetaryRingProps) {
         className="pointer-events-none absolute inset-0 flex items-center justify-center z-0"
       >
         <div ref={parallaxRef} className="will-change-transform flex items-center justify-center">
+          {/* data-ink-ring*: the theme transition draws a live copy of the ring bands above its
+              overlay (see src/ui/liveRing.ts) so the ring keeps orbiting during the ink */}
           <svg
+            data-ink-ring=""
             viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
             fill="none"
             className="w-[142vw] max-w-[560px] sm:w-[92vw] sm:max-w-[920px] lg:w-[88vw] lg:max-w-[1160px] h-auto overflow-visible"
@@ -279,7 +282,7 @@ export function PlanetaryRing({ heroRef, children }: PlanetaryRingProps) {
             </defs>
 
             {/* LAYER 1: Back half of ring (far side, behind core circle) */}
-            <g transform={`translate(${CX} ${CY}) rotate(${TILT_DEG})`}>
+            <g data-ink-ring-band="back" transform={`translate(${CX} ${CY}) rotate(${TILT_DEG})`}>
               <g clipPath={`url(#${backClipId})`} mask={`url(#${backFadeMaskId})`} opacity={0.45}>
                 {renderRingBand()}
               </g>
@@ -288,7 +291,7 @@ export function PlanetaryRing({ heroRef, children }: PlanetaryRingProps) {
             {/* LAYER 2: Dark core circle (solidly hides back half of ring) */}
             <g>
               {/* Solid opaque backing so nothing behind the sphere bleeds through */}
-              <circle cx={CX} cy={CY} r={CORE_R} fill="var(--noir)" />
+              <circle data-ink-ring-core="" cx={CX} cy={CY} r={CORE_R} fill="var(--noir)" />
               {/* Subtle radial sphere shading */}
               <circle cx={CX} cy={CY} r={CORE_R} fill={`url(#${coreGradId})`} />
               {/* 1px hairline outline in #6B6B6B at 50% opacity */}
@@ -312,7 +315,7 @@ export function PlanetaryRing({ heroRef, children }: PlanetaryRingProps) {
             </g>
 
             {/* LAYER 3: Front half of ring (near side, in front of core, behind wordmark) */}
-            <g transform={`translate(${CX} ${CY}) rotate(${TILT_DEG})`}>
+            <g data-ink-ring-band="front" transform={`translate(${CX} ${CY}) rotate(${TILT_DEG})`}>
               <g clipPath={`url(#${frontClipId})`} opacity={0.85}>
                 {renderRingBand()}
               </g>

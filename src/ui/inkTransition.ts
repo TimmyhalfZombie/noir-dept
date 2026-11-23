@@ -1,8 +1,16 @@
 // Adapted from Ink Bleed by Codemure (MIT License)
 import gsap from 'gsap';
-import { capturePage, documentSize, layoutKey, renderScale } from '../capture/capture';
+import {
+  SNAPSHOT_ANIMATION_TIME,
+  capturePage,
+  documentSize,
+  layoutKey,
+  pageCssAnimations,
+  renderScale,
+} from '../capture/capture';
 import { inkParams } from '../gl/params';
 import { InkRenderer, type InkFrame, type InkSource } from '../gl/renderer';
+import { LiveRing } from './liveRing';
 import { applyTheme, getTheme, otherTheme, type Theme } from './theme';
 import { ThemeIcon } from './themeIcon';
 
@@ -69,6 +77,10 @@ export class InkTransition {
   private cssFadeTimer = 0;
   private replayTimer = 0;
   private last: ClickRecord | null = null;
+  /** Live copy of the hero ring drawn above the overlay so it keeps orbiting. */
+  private liveRing: LiveRing | null = null;
+  /** Pending colour switches for `[data-ink-follow]` elements. */
+  private followTimers: number[] = [];
 
   private captureGen = 0;
   private capturing = false;
@@ -191,6 +203,9 @@ export class InkTransition {
     window.clearTimeout(this.cssFadeTimer);
     this.cancelScheduledCapture();
     this.cancel();
+    this.liveRing?.remove();
+    this.liveRing = null;
+    this.releaseFollowers();
     this.resumePageAnimations();
     this.icon?.kill();
     window.removeEventListener('resize', this.onResize);
@@ -252,8 +267,12 @@ export class InkTransition {
     this.state.time = 0;
 
     const chromeFrom = this.icon?.readChrome();
+    // Before applyTheme: pin [data-ink-follow] elements to the theme being covered.
+    this.pinFollowers(otherTheme(to));
     renderer.resize(scale);
     this.draw();
+    // Before applyTheme: the copy starts in the theme being covered (reused if interrupted).
+    this.liveRing ??= LiveRing.create(otherTheme(to));
     // Same task: the overlay (showing "from") and the flipped DOM hit the screen together.
     gsap.set(renderer.canvas, { opacity: 1 });
     renderer.canvas.classList.add('is-active');
@@ -267,6 +286,11 @@ export class InkTransition {
       chromeFrom,
       chromeDelay: this.inkArrival(center, maxDist, this.toggleCenter()) * duration,
     });
+    this.liveRing?.setTheme(
+      to,
+      (this.inkArrival(center, maxDist, this.liveRing.center()) * duration * 1000) / inkParams.timeScale,
+    );
+    this.followInk(to, center, maxDist, duration);
 
     this.tween = gsap.to(this.state, {
       progress: 1,
@@ -339,6 +363,10 @@ export class InkTransition {
     this.fade = null;
     this.frame = null;
     this.renderer?.canvas.classList.remove('is-active');
+    // The real ring kept spinning underneath on the same clock, so swapping back is seamless.
+    this.liveRing?.remove();
+    this.liveRing = null;
+    this.releaseFollowers();
     // Resume all paused live animations only AFTER the 0.35s fade-out completes.
     this.resumePageAnimations();
     // Refresh snapshots after theme change completion if needed or queued.
@@ -365,19 +393,66 @@ export class InkTransition {
     this.hide();
   }
 
+  // ---------- Live elements that follow the ink ----------
+  //
+  // Elements above the overlay (navbar) flip theme instantly, which can leave them on a
+  // background still showing the old theme. `[data-ink-follow]` elements instead keep the
+  // old theme's colours (a data-theme attribute re-scopes the CSS colour variables) until the
+  // ink front reaches their centre, then switch; their own CSS transition eases the change.
+
+  private pinFollowers(from: Theme): void {
+    document.querySelectorAll<HTMLElement>('[data-ink-follow]').forEach((el) => {
+      // Mid-transition re-toggle: keep whatever the element is showing right now.
+      if (!el.hasAttribute('data-theme')) el.setAttribute('data-theme', from);
+    });
+  }
+
+  private followInk(to: Theme, center: Point, maxDist: number, duration: number): void {
+    this.followTimers.forEach((t) => window.clearTimeout(t));
+    this.followTimers = [];
+    document.querySelectorAll<HTMLElement>('[data-ink-follow]').forEach((el) => {
+      const r = el.getBoundingClientRect();
+      const at = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      const delayMs = (this.inkArrival(center, maxDist, at) * duration * 1000) / inkParams.timeScale;
+      this.followTimers.push(window.setTimeout(() => el.setAttribute('data-theme', to), delayMs));
+    });
+  }
+
+  private releaseFollowers(): void {
+    this.followTimers.forEach((t) => window.clearTimeout(t));
+    this.followTimers = [];
+    // Back to inheriting the (already applied) page theme.
+    document.querySelectorAll('[data-ink-follow][data-theme]').forEach((el) => el.removeAttribute('data-theme'));
+  }
+
   // ---------- Live animation pause / resume ----------
 
   private pausePageAnimations(): void {
     if (this.animationsPaused) return;
     this.animationsPaused = true;
-    document.documentElement.dataset.themeTransitioning = 'true';
+    const root = document.documentElement;
+    // CSS animations are frozen by the `html[data-theme-transitioning]` rule in index.css.
+    root.dataset.themeTransitioning = 'true';
     window.dispatchEvent(new CustomEvent('theme-transitioning', { detail: { active: true } }));
 
-    // 1. CSS & Web Animations API (skip live navbar/grain and already-paused animations)
+    // 1. CSS animations: flush styles so the pause rule is applied, then hold them on the same
+    //    frame the snapshots were captured at, so the overlay and the page line up when it fades.
+    //    Seeking (unlike pause()/play()) leaves them driven by `animation-play-state`.
+    void getComputedStyle(root).animationPlayState;
+    for (const anim of pageCssAnimations()) {
+      if (anim.currentTime === null) continue;
+      try {
+        anim.currentTime = SNAPSHOT_ANIMATION_TIME;
+      } catch {
+        // Ignore animations that cannot be seeked
+      }
+    }
+
+    // 2. Other running animations (Motion / Web Animations API, CSS transitions).
     const webAnims: Animation[] = [];
     if (typeof document.getAnimations === 'function') {
       for (const anim of document.getAnimations()) {
-        if (anim.playState !== 'running') continue;
+        if (anim instanceof CSSAnimation || anim.playState !== 'running') continue;
         const target = (anim.effect as KeyframeEffect | null)?.target;
         if (target instanceof Element && target.closest('[data-ink-live]')) continue;
         try {
@@ -390,12 +465,16 @@ export class InkTransition {
     }
     this.pausedWebAnims = webAnims;
 
-    // 2. SVG SMIL animations (skip live navbar/toggle SVGs and already-paused SVGs)
+    // 3. SVG SMIL animations: rewind to the start (the SVG frame the snapshot shows) and pause.
+    //    Skip live navbar/toggle SVGs; SVGs already paused (off-screen) stay paused.
     const svgs: SVGSVGElement[] = [];
     document.querySelectorAll<SVGSVGElement>('svg').forEach((svg) => {
       if (svg.closest('[data-ink-live]')) return;
       if (typeof svg.pauseAnimations !== 'function') return;
       try {
+        if (svg.querySelector('animate, animateMotion, animateTransform, set')) {
+          svg.setCurrentTime(0);
+        }
         if (typeof svg.animationsPaused === 'function' && svg.animationsPaused()) return;
         svg.pauseAnimations();
         svgs.push(svg);
@@ -409,6 +488,7 @@ export class InkTransition {
   private resumePageAnimations(): void {
     if (!this.animationsPaused) return;
     this.animationsPaused = false;
+    // Removing the flag hands CSS animations back to their own `animation-play-state`.
     delete document.documentElement.dataset.themeTransitioning;
 
     for (const anim of this.pausedWebAnims) {
