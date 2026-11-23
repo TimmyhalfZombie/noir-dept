@@ -14,23 +14,13 @@ export function ServiceCard({ service }: ServiceCardProps) {
             <span>{service.number}</span>
             <FourPointStar className="w-2.5 h-2.5 text-ivory" />
           </div>
-
-          {service.tag && (
-            <span className="text-[10px] uppercase tracking-[0.22em] text-ivory border border-stone px-2.5 py-1 whitespace-nowrap shrink-0">
-              {service.tag}
-            </span>
-          )}
         </div>
 
         <h3 className="font-serif text-2xl sm:text-3xl font-bold uppercase tracking-[-0.015em] text-ivory mb-4">
           {service.title}
         </h3>
 
-        <p
-          className={`text-sm sm:text-base leading-relaxed ${
-            service.isPlaceholder ? 'text-stone italic' : 'text-steel'
-          }`}
-        >
+        <p className="text-sm sm:text-base leading-relaxed text-steel">
           {service.description}
         </p>
       </div>

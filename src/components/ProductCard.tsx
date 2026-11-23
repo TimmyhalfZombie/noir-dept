@@ -1,20 +1,39 @@
-import type { ProductItem } from '../config/siteConfig';
-import { useTheme } from '../context/ThemeContext';
+import { useEffect, useState } from 'react';
+import { siteConfig } from '../config/siteConfig';
+import {
+  getFallbackPlaceholder,
+  getProductImageAlt,
+  type Product,
+} from '../data/products';
+import { getTheme, type Theme } from '../ui/theme';
 
 interface ProductCardProps {
-  product: ProductItem;
-  onSelect: (product: ProductItem) => void;
+  product: Product;
+  onSelect: (product: Product) => void;
 }
 
 export function ProductCard({ product, onSelect }: ProductCardProps) {
-  const { theme } = useTheme();
+  const [theme, setTheme] = useState<Theme>(() => getTheme());
+  const [showBackTouch, setShowBackTouch] = useState(false);
+  const [frontError, setFrontError] = useState(false);
+  const [backError, setBackError] = useState(false);
+
+  useEffect(() => {
+    const onThemeChange = (e: Event) => {
+      setTheme((e as CustomEvent<Theme>).detail ?? getTheme());
+    };
+    window.addEventListener('noir-theme-change', onThemeChange);
+    return () => window.removeEventListener('noir-theme-change', onThemeChange);
+  }, []);
+
   const isSold = product.status === 'SOLD';
-  const primaryPhoto = product.gallery[0];
-  const secondaryPhoto = product.gallery[1] ?? product.gallery[0];
-  const primarySrc =
-    theme === 'light' && primaryPhoto.lightSrc ? primaryPhoto.lightSrc : primaryPhoto.src;
-  const secondarySrc =
-    theme === 'light' && secondaryPhoto.lightSrc ? secondaryPhoto.lightSrc : secondaryPhoto.src;
+
+  const frontSrc = frontError
+    ? getFallbackPlaceholder('Front', theme)
+    : product.frontImage;
+  const backSrc = backError
+    ? getFallbackPlaceholder('Back', theme)
+    : product.backImage;
 
   const statusTone =
     product.status === 'AVAILABLE'
@@ -23,36 +42,77 @@ export function ProductCard({ product, onSelect }: ProductCardProps) {
       ? 'text-steel'
       : 'text-stone line-through';
 
+  const imageFilter = isSold
+    ? 'grayscale(100%)'
+    : 'grayscale(15%) contrast(1.02)';
+
   return (
-    <button
-      type="button"
-      onClick={() => onSelect(product)}
-      aria-label={`Inspect ${product.brand} ${product.name} (${product.slotCode})`}
-      className={`group text-left w-full flex flex-col bg-noir border border-charcoal hover:border-ivory transition-colors duration-200 cursor-pointer focus-visible:outline-1 focus-visible:outline-ivory focus-visible:outline-offset-2 ${
-        isSold ? 'opacity-65 hover:opacity-85' : ''
-      }`}
-    >
-      {/* Square photo container on charcoal surface */}
+    <article className="group relative flex flex-col bg-noir border border-charcoal hover:border-ivory has-[.card-trigger:focus-visible]:outline-1 has-[.card-trigger:focus-visible]:outline-ivory has-[.card-trigger:focus-visible]:outline-offset-2 transition-colors duration-200">
+      {/* Square photo container */}
       <div className="relative aspect-square w-full overflow-hidden bg-charcoal border-b border-charcoal">
+        {/* Front image */}
         <img
-          src={primarySrc}
-          alt={primaryPhoto.alt}
+          data-ink-live
+          src={frontSrc}
+          alt={getProductImageAlt(product, 'front')}
+          width={800}
+          height={800}
           loading="lazy"
+          decoding="async"
           referrerPolicy="no-referrer"
-          className={`h-full w-full object-cover transition-opacity duration-300 ${
-            isSold ? 'grayscale' : ''
-          } group-hover:opacity-0`}
-        />
-        <img
-          src={secondarySrc}
-          alt={secondaryPhoto.alt}
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          aria-hidden="true"
-          className={`absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-300 group-hover:opacity-100 ${
-            isSold ? 'grayscale' : ''
+          onError={() => setFrontError(true)}
+          style={{ filter: imageFilter }}
+          className={`h-full w-full object-cover transition-[opacity,transform] duration-500 ease-out [@media(hover:hover)]:group-hover:scale-[1.03] [@media(hover:hover)]:group-hover:opacity-0 ${
+            showBackTouch ? 'opacity-0' : isSold ? 'opacity-60' : 'opacity-100'
           }`}
         />
+
+        {/* Back image */}
+        <img
+          data-ink-live
+          src={backSrc}
+          alt={getProductImageAlt(product, 'back')}
+          width={800}
+          height={800}
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          aria-hidden="true"
+          onError={() => setBackError(true)}
+          style={{ filter: imageFilter }}
+          className={`absolute inset-0 h-full w-full object-cover transition-[opacity,transform] duration-500 ease-out [@media(hover:hover)]:group-hover:scale-[1.03] ${
+            isSold
+              ? '[@media(hover:hover)]:group-hover:opacity-60'
+              : '[@media(hover:hover)]:group-hover:opacity-100'
+          } ${
+            showBackTouch
+              ? isSold
+                ? 'opacity-60'
+                : 'opacity-100'
+              : 'opacity-0'
+          }`}
+        />
+
+        {/* Preview mode SAMPLE label (disappears when previewMode is false) */}
+        {siteConfig.previewMode && (
+          <span className="pointer-events-none absolute top-2.5 left-2.5 z-10 px-2 py-0.5 text-[10px] uppercase tracking-[0.22em] bg-noir/85 text-ivory border border-ivory/60">
+            SAMPLE
+          </span>
+        )}
+
+        {/* Touch-only FRONT / BACK toggle button on bottom-right of image */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowBackTouch((prev) => !prev);
+          }}
+          aria-pressed={showBackTouch}
+          aria-label={`Show ${showBackTouch ? 'front' : 'back'} view of ${product.name}`}
+          className="[@media(hover:hover)]:hidden absolute bottom-2.5 right-2.5 z-20 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] bg-noir/90 text-ivory border border-ivory/60 cursor-pointer focus-visible:outline-1 focus-visible:outline-ivory focus-visible:outline-offset-2"
+        >
+          {showBackTouch ? 'FRONT' : 'BACK'}
+        </button>
       </div>
 
       {/* Editorial product metadata */}
@@ -66,7 +126,14 @@ export function ProductCard({ product, onSelect }: ProductCardProps) {
           </div>
 
           <h3 className="font-serif text-lg sm:text-xl font-semibold tracking-[-0.01em] text-ivory leading-snug">
-            {product.name}
+            <button
+              type="button"
+              onClick={() => onSelect(product)}
+              aria-label={`Inspect ${product.name}, ${product.size}, ${product.price}, ${product.status}`}
+              className="card-trigger text-left cursor-pointer focus-visible:outline-none after:content-[''] after:absolute after:inset-0 after:z-10"
+            >
+              {product.name}
+            </button>
           </h3>
         </div>
 
@@ -85,6 +152,6 @@ export function ProductCard({ product, onSelect }: ProductCardProps) {
           </p>
         </div>
       </div>
-    </button>
+    </article>
   );
 }

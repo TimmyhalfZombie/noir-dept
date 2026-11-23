@@ -1,37 +1,9 @@
-export type ProductStatus = 'AVAILABLE' | 'RESERVED' | 'SOLD';
-
-export interface ProductGalleryImage {
-  label: 'Front' | 'Back' | 'Tag / Label' | 'Details' | 'Flaws';
-  src: string;
-  lightSrc?: string;
-  alt: string;
-}
-
-export interface ProductMeasurement {
-  label: string;
-  value: string;
-}
-
-export interface ProductItem {
-  id: string;
-  slotCode: string;
-  name: string;
-  brand: string;
-  size: string;
-  condition: string;
-  price: string;
-  status: ProductStatus;
-  conditionNotes: string;
-  measurements: ProductMeasurement[];
-  gallery: ProductGalleryImage[];
-}
+import { seoRoutes, site } from './site';
 
 export interface ServiceItem {
   number: string;
   title: string;
   description: string;
-  tag?: string;
-  isPlaceholder?: boolean;
 }
 
 export interface ConditionGradeItem {
@@ -64,117 +36,14 @@ export interface ExpectationItem {
   description: string;
 }
 
-/**
- * Generates a clearly labeled monochrome gray placeholder image (SVG data URI).
- * Replace src with real photo URLs or local paths (e.g. "/images/drop-01-front.jpg")
- * when listing actual pieces (and omit lightSrc for real photos).
- */
-function createPlaceholderPhoto(
-  slotCode: string,
-  viewLabel: string,
-  tone: 'front' | 'back' | 'tag' | 'detail' | 'flaws',
-  mode: 'dark' | 'light' = 'dark'
-): string {
-  const darkPalettes = {
-    front: { bg: '#222222', grid: '#363636', frame: '#4A4A4A', text: '#A8A8A4', sub: '#6E6E6B' },
-    back: { bg: '#2A2A2A', grid: '#3D3D3D', frame: '#525252', text: '#B5B5B0', sub: '#7A7A76' },
-    tag: { bg: '#252525', grid: '#383838', frame: '#4E4E4E', text: '#ADADA8', sub: '#737370' },
-    detail: { bg: '#272727', grid: '#3B3B3B', frame: '#505050', text: '#B0B0AB', sub: '#757572' },
-    flaws: { bg: '#1E1E1E', grid: '#323232', frame: '#464646', text: '#9E9E9A', sub: '#6A6A67' },
-  };
-
-  const lightPalettes = {
-    front: { bg: '#E6E5DE', grid: '#CECDC6', frame: '#B5B4AC', text: '#42423F', sub: '#70706B' },
-    back: { bg: '#DDDCDA', grid: '#C4C3BC', frame: '#ACABA3', text: '#383835', sub: '#686864' },
-    tag: { bg: '#E2E1DA', grid: '#CAC9C2', frame: '#B0AFA8', text: '#40403D', sub: '#6E6E6A' },
-    detail: { bg: '#DFDED7', grid: '#C7C6BF', frame: '#AEADA6', text: '#3D3D3A', sub: '#6B6B67' },
-    flaws: { bg: '#E9E8E1', grid: '#D1D0C9', frame: '#B8B7B0', text: '#464643', sub: '#747470' },
-  };
-
-  const palette = (mode === 'dark' ? darkPalettes : lightPalettes)[tone];
-
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" fill="none">
-    <rect width="800" height="800" fill="${palette.bg}"/>
-    <rect x="36" y="36" width="728" height="728" stroke="${palette.grid}" stroke-width="1"/>
-    <line x1="36" y1="76" x2="76" y2="76" stroke="${palette.frame}" stroke-width="1"/>
-    <line x1="76" y1="36" x2="76" y2="76" stroke="${palette.frame}" stroke-width="1"/>
-    <line x1="724" y1="76" x2="764" y2="76" stroke="${palette.frame}" stroke-width="1"/>
-    <line x1="724" y1="36" x2="724" y2="76" stroke="${palette.frame}" stroke-width="1"/>
-    <line x1="36" y1="724" x2="76" y2="724" stroke="${palette.frame}" stroke-width="1"/>
-    <line x1="76" y1="724" x2="76" y2="764" stroke="${palette.frame}" stroke-width="1"/>
-    <line x1="724" y1="724" x2="764" y2="724" stroke="${palette.frame}" stroke-width="1"/>
-    <line x1="724" y1="724" x2="724" y2="764" stroke="${palette.frame}" stroke-width="1"/>
-    <circle cx="400" cy="368" r="96" stroke="${palette.grid}" stroke-width="1"/>
-    <path d="M400 342 L404.5 363.5 L426 368 L404.5 372.5 L400 394 L395.5 372.5 L374 368 L395.5 363.5 Z" fill="${palette.frame}"/>
-    <text x="400" y="515" text-anchor="middle" fill="${palette.text}" font-family="sans-serif" font-size="18" letter-spacing="6">${viewLabel.toUpperCase()}</text>
-    <text x="400" y="548" text-anchor="middle" fill="${palette.sub}" font-family="sans-serif" font-size="13" letter-spacing="4">${slotCode} · PHOTO PLACEHOLDER</text>
-  </svg>`;
-
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-}
-
-function buildPlaceholderProduct(
-  index: number,
-  status: ProductStatus
-): ProductItem {
-  const code = `DROP ${String(index).padStart(2, '0')}`;
-  return {
-    id: `placeholder-item-${index}`,
-    slotCode: code,
-    name: 'Item Name',
-    brand: 'Brand',
-    size: '—',
-    condition: '—',
-    price: '₱—',
-    status,
-    conditionNotes: '[Condition notes to be added]',
-    measurements: [
-      { label: 'Chest (Pit to Pit)', value: '—' },
-      { label: 'Length', value: '—' },
-      { label: 'Shoulder', value: '—' },
-      { label: 'Sleeve', value: '—' },
-    ],
-    gallery: [
-      {
-        label: 'Front',
-        src: createPlaceholderPhoto(code, 'Front View', 'front', 'dark'),
-        lightSrc: createPlaceholderPhoto(code, 'Front View', 'front', 'light'),
-        alt: `${code} front view placeholder image`,
-      },
-      {
-        label: 'Back',
-        src: createPlaceholderPhoto(code, 'Back View', 'back', 'dark'),
-        lightSrc: createPlaceholderPhoto(code, 'Back View', 'back', 'light'),
-        alt: `${code} back view placeholder image`,
-      },
-      {
-        label: 'Tag / Label',
-        src: createPlaceholderPhoto(code, 'Tag / Label', 'tag', 'dark'),
-        lightSrc: createPlaceholderPhoto(code, 'Tag / Label', 'tag', 'light'),
-        alt: `${code} tag and label placeholder image`,
-      },
-      {
-        label: 'Details',
-        src: createPlaceholderPhoto(code, 'Details', 'detail', 'dark'),
-        lightSrc: createPlaceholderPhoto(code, 'Details', 'detail', 'light'),
-        alt: `${code} garment details placeholder image`,
-      },
-      {
-        label: 'Flaws',
-        src: createPlaceholderPhoto(code, 'Flaws', 'flaws', 'dark'),
-        lightSrc: createPlaceholderPhoto(code, 'Flaws', 'flaws', 'light'),
-        alt: `${code} flaws documentation placeholder image`,
-      },
-    ],
-  };
-}
-
 export const siteConfig = {
+  previewMode: true as boolean,
+
   brand: {
-    name: 'NOIR DEPT.',
-    descriptor: 'STREETWEAR • RARE FINDS',
-    slogan: 'WEAR THE PAST. KEEP THE STYLE.',
-    facebookUrl: 'https://www.facebook.com/profile.php?id=61596666997168',
+    name: site.name,
+    descriptor: site.tagline.toUpperCase(),
+    slogan: site.slogan.toUpperCase(),
+    facebookUrl: site.facebookUrl,
     facebookHandle: 'NOIR DEPT. on Facebook',
   },
 
@@ -189,19 +58,20 @@ export const siteConfig = {
 
   meta: {
     home: {
-      title: 'NOIR DEPT. — Streetwear • Rare Finds',
-      description:
-        'Independent resale shop for secondhand branded streetwear, graphic hoodies, and distinctive pre-loved pieces.',
+      title: seoRoutes.home.title,
+      description: seoRoutes.home.description,
     },
     about: {
-      title: 'About — NOIR DEPT.',
-      description:
-        'THE DEPARTMENT. An independent shop for secondhand branded streetwear. Pre-loved pieces, picked with intent.',
+      title: seoRoutes.about.title,
+      description: seoRoutes.about.description,
     },
     services: {
-      title: 'Services — NOIR DEPT.',
-      description:
-        'How NOIR DEPT. works: curated drops on Facebook, direct item inquiries, honest condition reports, and straightforward buying steps.',
+      title: seoRoutes.services.title,
+      description: seoRoutes.services.description,
+    },
+    privacy: {
+      title: seoRoutes.privacy.title,
+      description: seoRoutes.privacy.description,
     },
   },
 
@@ -213,14 +83,20 @@ export const siteConfig = {
     latestDrop: {
       kicker: '01 / DROP',
       title: 'LATEST DROP',
-      subtitle: 'Selected secondhand branded pieces. Click any piece to view photos and measurements.',
+      subtitle: "Drop 01. One of each, so when it's gone, it's gone.",
+      previewSubtitle:
+        'Preview pieces. Live drops are posted on our Facebook page.',
       emptyMessage: 'No pieces under this status right now.',
-      modalInquiryCta: 'Message to Inquire',
+      modalInquiryCta: 'MESSAGE TO INQUIRE',
+      modalSoldCta: 'SOLD, MESSAGE FOR SIMILAR PIECES',
+      modalPreviewCta: 'SAMPLE LISTING, NOT FOR SALE',
+      modalFootnote:
+        'Secondhand item. Please check all photos and ask about anything before buying.',
     },
     introStrip: {
       kicker: '02 / ETHOS',
       statement: 'Pre-loved pieces. Picked with intent.',
-      linkLabel: 'Read About Us',
+      linkLabel: 'Read about us',
       linkTo: '/about',
     },
     whatToExpect: {
@@ -232,31 +108,21 @@ export const siteConfig = {
         {
           number: '01',
           title: 'Real photos',
-          description: 'Actual photos of the exact piece in hand, front to tag.',
+          description: 'Front, back, tags and flaws. You see the actual piece.',
         },
         {
           number: '02',
           title: 'Honest condition',
-          description: 'Wear, fading, and flaws noted plainly before you inquire.',
+          description: 'Wear, fading and marks are written down, not hidden.',
         },
         {
           number: '03',
           title: 'Direct inquiries',
-          description: 'Message our Facebook page for sizing, details, and availability.',
+          description: 'Ask for measurements or extra photos. We reply straight.',
         },
       ] as ExpectationItem[],
     },
   },
-
-  // Placeholder drop items only — replace with real pieces, prices, and photos when ready.
-  products: [
-    buildPlaceholderProduct(1, 'AVAILABLE'),
-    buildPlaceholderProduct(2, 'AVAILABLE'),
-    buildPlaceholderProduct(3, 'AVAILABLE'),
-    buildPlaceholderProduct(4, 'RESERVED'),
-    buildPlaceholderProduct(5, 'AVAILABLE'),
-    buildPlaceholderProduct(6, 'SOLD'),
-  ] as ProductItem[],
 
   about: {
     hero: {
@@ -270,18 +136,17 @@ export const siteConfig = {
       paragraphs: [
         "NOIR DEPT. finds secondhand branded clothing worth a second look: graphic hoodies, recognizable labels and distinctive pieces. We're not a bargain bin or a generic thrift rack. Each piece is chosen for its look, label, fit and condition, then listed with real photos and honest details.",
       ],
-      ownerStoryPlaceholder: '[Owner story — to be added]',
     },
     founder: {
-      label: '03 / THE FOUNDER',
-      portraitSrc: '', // Replace with portrait photo URL or local path when ready
-      portraitAlt: 'Portrait of the founder of NOIR DEPT.',
-      name: '[Founder Name]',
-      role: 'Founder, NOIR DEPT.',
+      label: '03 / FROM THE FOUNDER',
+      portraitSrc: '/founder.jpg',
+      portraitAlt: 'Founder of NOIR DEPT.',
       paragraphs: [
-        '[Founder bio — paste your copy here]',
+        "I started NOIR DEPT. because I kept finding pieces that deserved better than the bottom of a thrift pile. A good hoodie with the right label and the right wear says something new clothes can't.",
+        "Every piece here passes through my hands first. I check the tags, the stitching and the flaws, and I photograph each one myself. If something's off, I'll tell you. I'd rather lose a sale than lose your trust.",
+        "NOIR DEPT. is small, and that's on purpose. Fewer pieces, picked with care.",
       ],
-      signature: '[Signature line — paste your copy here]',
+      signature: '— NOIR DEPT.',
     },
     principles: {
       kicker: 'WHAT WE STAND FOR',
@@ -299,8 +164,8 @@ export const siteConfig = {
         },
         {
           number: '03',
-          title: 'Independent',
-          description: 'Our own identity, separate from the labels we resell.',
+          title: 'Distinct',
+          description: 'Our own name, our own look. Separate from the labels we resell.',
         },
         {
           number: '04',
@@ -329,38 +194,37 @@ export const siteConfig = {
           number: '01',
           title: 'Curated Drops',
           description:
-            'New secondhand branded pieces, posted as drops on our Facebook page.',
+            'New pieces go up in drops on our Facebook page. Each one is one of one, so turn on notifications.',
         },
         {
           number: '02',
           title: 'Item Inquiries',
           description:
-            'Message us for sizing, measurements, extra photos or details on any piece.',
+            'Message us for measurements, extra photos or a closer look at any flaw before you decide.',
         },
         {
           number: '03',
           title: 'Honest Condition Reports',
           description:
-            'Every listing describes wear, fading, marks or repairs plainly, with photos of any flaws.',
+            'Every listing states the condition plainly, with photos of any wear, fading or repairs.',
         },
         {
           number: '04',
           title: 'Sourcing Requests',
-          description: '[To be confirmed]',
-          tag: 'COMING SOON / TBC',
-          isPlaceholder: true,
+          description:
+            "Looking for a specific piece or label? Send us what you're after and your size. We'll message you if we find it.",
         },
         {
           number: '05',
           title: 'Reservations',
-          description: '[Policy to be added]',
-          isPlaceholder: true,
+          description:
+            "Ask about holding a piece when you message us. We'll tell you what's possible for that item.",
         },
         {
           number: '06',
           title: 'Delivery & Meet-ups',
-          description: '[Couriers / areas to be added]',
-          isPlaceholder: true,
+          description:
+            "Tell us your city when you message, and we'll walk you through delivery or meet-up options for your area.",
         },
       ] as ServiceItem[],
     },
@@ -371,17 +235,18 @@ export const siteConfig = {
         {
           number: '01',
           title: 'Browse the drop',
-          description: 'Review photos, size, condition notes, and measurements.',
+          description: 'Find a piece you like and note its name.',
         },
         {
           number: '02',
           title: 'Message the page',
-          description: 'Send the item name on Facebook to check availability or ask questions.',
+          description: 'Send us the item name. Ask anything about size or condition.',
         },
         {
           number: '03',
           title: 'Confirm details',
-          description: 'Finalize condition, fit, and handover directly with us.',
+          description:
+            "We'll confirm availability, payment and delivery with you directly.",
         },
       ] as StepItem[],
     },
@@ -389,12 +254,26 @@ export const siteConfig = {
       kicker: 'REFERENCE',
       title: 'CONDITION GUIDE',
       intro:
-        'Each listing uses a plain condition label paired with close-up photos of any wear or flaws. Fill in your grading scale below.',
+        'Every listing is graded plainly and paired with close-up photos of any wear or flaws.',
       grades: [
-        { grade: '[Grade 01]', description: '[description]' },
-        { grade: '[Grade 02]', description: '[description]' },
-        { grade: '[Grade 03]', description: '[description]' },
-        { grade: '[Grade 04]', description: '[description]' },
+        {
+          grade: 'EXCELLENT',
+          description: 'Barely worn. No visible flaws.',
+        },
+        {
+          grade: 'VERY GOOD',
+          description: 'Light signs of wear. No major flaws.',
+        },
+        {
+          grade: 'GOOD',
+          description:
+            'Visible wear such as fading or pilling. Any marks are shown in photos.',
+        },
+        {
+          grade: 'FAIR',
+          description:
+            'Noticeable flaws such as stains, small holes or repairs, all shown in photos.',
+        },
       ] as ConditionGradeItem[],
     },
     faq: {
@@ -404,32 +283,51 @@ export const siteConfig = {
         {
           id: 'sizing',
           topic: 'SIZING',
-          question: 'How are sizing and measurements taken?',
-          answer: '[Answer to be added]',
+          question: "How do I know if it'll fit?",
+          answer:
+            "Every listing shows the tag size. Message us and we'll send exact measurements: pit to pit, length and sleeve.",
         },
         {
-          id: 'payment',
-          topic: 'PAYMENT',
-          question: 'What payment methods are accepted?',
-          answer: '[Answer to be added]',
-        },
-        {
-          id: 'shipping',
-          topic: 'SHIPPING',
-          question: 'How do shipping and delivery work?',
-          answer: '[Answer to be added]',
+          id: 'condition',
+          topic: 'CONDITION',
+          question: 'Are the items new?',
+          answer:
+            'No. Everything is secondhand. Condition is listed on every piece, flaws included.',
         },
         {
           id: 'reservations',
           topic: 'RESERVATIONS',
-          question: 'Can an item be reserved?',
-          answer: '[Answer to be added]',
+          question: 'Can I reserve a piece?',
+          answer:
+            "Message us about the item and we'll let you know if it can be held.",
         },
         {
-          id: 'returns',
-          topic: 'RETURNS',
-          question: 'What is the return or exchange policy?',
-          answer: '[Answer to be added]',
+          id: 'payment',
+          topic: 'PAYMENT',
+          question: 'How do I pay?',
+          answer:
+            'Payment options are confirmed when you message us to buy.',
+        },
+        {
+          id: 'delivery',
+          topic: 'DELIVERY',
+          question: 'Do you ship or meet up?',
+          answer:
+            "Tell us where you are and we'll let you know the delivery or meet-up options.",
+        },
+        {
+          id: 'orders',
+          topic: 'ORDERS',
+          question: "What if there's a problem with my order?",
+          answer:
+            "Each piece is secondhand and one of one, so check the photos and ask questions before buying. If something isn't right, message us and we'll talk it through.",
+        },
+        {
+          id: 'independence',
+          topic: 'BRANDS',
+          question: 'Are you affiliated with the brands you sell?',
+          answer:
+            "No. NOIR DEPT. is an independent reseller of pre-owned clothing and isn't affiliated with, endorsed by or sponsored by any brand we resell.",
         },
       ] as FaqItem[],
     },

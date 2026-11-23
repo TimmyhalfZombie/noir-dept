@@ -39,6 +39,12 @@ export function Footer() {
                   {item.label}
                 </Link>
               ))}
+              <Link
+                to="/privacy"
+                className="text-sm text-steel hover:text-ivory transition-colors w-fit"
+              >
+                Privacy
+              </Link>
             </nav>
           </div>
 

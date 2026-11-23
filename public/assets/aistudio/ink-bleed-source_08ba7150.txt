@@ -1,0 +1,1331 @@
+INK BLEED THEME CHANGER — SOURCE FILES
+Adapted from Ink Bleed by Codemure (MIT License). https://github.com/codemure-official/ink-bleed-theme-changer
+Each file below starts with a line: ===== FILE: <path> =====
+Recreate each one as its own file at that path (e.g. src/ui/inkTransition.ts).
+
+===== FILE: LICENSE =====
+MIT License
+
+Copyright (c) 2026 Codemure
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+===== END FILE: LICENSE =====
+
+===== FILE: src/ui/theme.ts =====
+export type Theme = 'light' | 'dark';
+
+const root = document.documentElement;
+
+export function getTheme(): Theme {
+  return root.dataset.theme === 'dark' ? 'dark' : 'light';
+}
+
+export function otherTheme(theme: Theme): Theme {
+  return theme === 'dark' ? 'light' : 'dark';
+}
+
+/** Instantly applies a theme to the live DOM and keeps the toggle's ARIA state in sync. */
+export function applyTheme(theme: Theme, toggle?: HTMLButtonElement | null): void {
+  root.dataset.theme = theme;
+  if (toggle) {
+    toggle.setAttribute('aria-pressed', String(theme === 'dark'));
+  }
+}
+
+===== END FILE: src/ui/theme.ts =====
+
+===== FILE: src/ui/themeIcon.ts =====
+import gsap from 'gsap';
+import { MorphSVGPlugin } from 'gsap/MorphSVGPlugin';
+import type { Theme } from './theme';
+
+gsap.registerPlugin(MorphSVGPlugin);
+
+const SUN = 'M12 7a5 5 0 1 1 0 10a5 5 0 1 1 0-10z';
+const MOON = 'M20.5 13.2A8.5 8.5 0 1 1 10.8 3.5a7.2 7.2 0 0 0 9.7 9.7z';
+
+interface IconPose {
+  body: string;
+  rays: { scale: number; opacity: number; rotation: number };
+  icon: number; // whole-icon rotation, degrees
+}
+
+const POSE: Record<Theme, IconPose> = {
+  light: { body: SUN, rays: { scale: 1, opacity: 1, rotation: 0 }, icon: 0 },
+  dark: { body: MOON, rays: { scale: 0.2, opacity: 0, rotation: -60 }, icon: -25 },
+};
+
+export interface MorphOptions {
+  duration: number;
+  ease: string;
+  timeScale: number;
+  /** Seconds after which the button chrome (bg / border / colour) switches theme. */
+  chromeDelay?: number;
+  /** Starting chrome colours (computed before the DOM theme flipped). */
+  chromeFrom?: ChromeColors;
+}
+
+export interface ChromeColors {
+  backgroundColor: string;
+  borderColor: string;
+  color: string;
+}
+
+/**
+ * The toggle's sun ↔ moon icon. It lives above the ink overlay (it is hidden in the
+ * snapshots), so it animates on its own, in lock-step with the ink: same duration, ease
+ * and time scale. Its chrome colours are held at the old theme until the ink reaches it.
+ */
+export class ThemeIcon {
+  private readonly button: HTMLElement;
+  private readonly icon: SVGSVGElement | null;
+  private readonly body: SVGPathElement | null;
+  private readonly rays: SVGLineElement[];
+  private timeline: gsap.core.Timeline | null = null;
+
+  constructor(button: HTMLElement) {
+    this.button = button;
+    this.icon = button.querySelector('svg');
+    this.body = button.querySelector('.theme-toggle__body');
+    this.rays = Array.from(button.querySelectorAll<SVGLineElement>('.theme-toggle__rays line'));
+  }
+
+  kill(): void {
+    this.timeline?.kill();
+    this.timeline = null;
+  }
+
+  setTimeScale(scale: number): void {
+    this.timeline?.timeScale(scale);
+  }
+
+  /** Current chrome colours as rendered (call before flipping the theme). */
+  readChrome(): ChromeColors {
+    const cs = getComputedStyle(this.button);
+    return { backgroundColor: cs.backgroundColor, borderColor: cs.borderTopColor, color: cs.color };
+  }
+
+  /** Jump to a theme's pose without animating. */
+  set(theme: Theme): void {
+    this.timeline?.kill();
+    this.timeline = null;
+    const pose = POSE[theme];
+    if (this.body) gsap.set(this.body, { morphSVG: pose.body });
+    gsap.set(this.rays, { ...pose.rays, svgOrigin: '12 12' });
+    if (this.icon) gsap.set(this.icon, { rotation: pose.icon, transformOrigin: '50% 50%' });
+    gsap.set(this.button, { clearProps: 'backgroundColor,borderColor,color' });
+  }
+
+  /** Animate to a theme's pose, starting from wherever the icon currently is. */
+  morphTo(theme: Theme, opts: MorphOptions): void {
+    this.timeline?.kill();
+    const pose = POSE[theme];
+    const tl = gsap.timeline({ defaults: { duration: opts.duration, ease: opts.ease } });
+
+    if (this.body) tl.to(this.body, { morphSVG: { shape: pose.body, shapeIndex: 'auto' } }, 0);
+    // Rays retract / bloom one after another, like the ink sweeping round.
+    tl.to(this.rays, { ...pose.rays, svgOrigin: '12 12', stagger: opts.duration * 0.035 }, 0);
+    if (this.icon) tl.to(this.icon, { rotation: pose.icon, transformOrigin: '50% 50%' }, 0);
+
+    if (opts.chromeFrom) {
+      // Hold the old colours (the live DOM already has the new theme), then hand over to
+      // the stylesheet as the ink arrives.
+      // Plain style write (not gsap.set) so the hold lands in this very frame.
+      Object.assign(this.button.style, opts.chromeFrom);
+      const delay = opts.chromeDelay ?? 0;
+      const swap = Math.min(0.18, opts.duration * 0.15);
+      tl.to(
+        this.button,
+        {
+          backgroundColor: () => this.targetChrome().backgroundColor,
+          borderColor: () => this.targetChrome().borderColor,
+          color: () => this.targetChrome().color,
+          duration: swap,
+          ease: 'power1.out',
+          onComplete: () => {
+            gsap.set(this.button, { clearProps: 'backgroundColor,borderColor,color' });
+          },
+        },
+        delay,
+      );
+    } else {
+      gsap.set(this.button, { clearProps: 'backgroundColor,borderColor,color' });
+    }
+
+    tl.timeScale(opts.timeScale);
+    this.timeline = tl;
+  }
+
+  /** Stylesheet colours for the current (already flipped) theme. */
+  private targetChrome(): ChromeColors {
+    const saved = this.button.getAttribute('style') ?? '';
+    this.button.style.removeProperty('background-color');
+    this.button.style.removeProperty('border-color');
+    this.button.style.removeProperty('color');
+    const target = this.readChrome();
+    this.button.setAttribute('style', saved);
+    return target;
+  }
+}
+
+===== END FILE: src/ui/themeIcon.ts =====
+
+===== FILE: src/ui/inkTransition.ts =====
+import gsap from 'gsap';
+import { capturePage, layoutKey, renderScale } from '../capture/capture';
+import { inkParams } from '../gl/params';
+import { InkRenderer, type InkFrame, type InkSource } from '../gl/renderer';
+import { applyTheme, getTheme, otherTheme, type Theme } from './theme';
+import { ThemeIcon } from './themeIcon';
+
+export interface Point {
+  x: number;
+  y: number;
+}
+
+const EASE = 'power3.out';
+const FADE_OUT = 0.15;
+const RESIZE_DEBOUNCE_MS = 250;
+/** CSS cross-fade used without WebGL2, with reduced motion, or before snapshots are ready. */
+const CSS_FADE_S = 0.45;
+
+/**
+ * Spread shape over time. `growth`: base radius at progress 1 relative to the farthest
+ * corner. `cleanupFrom`: fraction of the (linear) duration after which a uniform extra
+ * reach slowly eats whatever the noise left behind, so the page is fully covered exactly
+ * at the end. `cleanupReach`: that extra reach at t = 1, relative to the farthest corner.
+ */
+export const SPREAD = { growth: 0.7, cleanupFrom: 0.45, cleanupReach: 0.4, cleanupPow: 2 };
+
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+/** Everything needed to reproduce a transition exactly ("replay last click"). */
+export interface ClickRecord {
+  point: Point;
+  seed: InkFrame['seed'];
+  from: Theme;
+}
+
+const REPLAY_HOLD_MS = 400;
+
+type ActiveFrame = Omit<InkFrame, 'progress' | 'radius' | 'time' | 'cleanup'>;
+
+/**
+ * Orchestrates the theme transition:
+ *  1. keeps fresh snapshots of both themes on the GPU (pre-captured, re-captured on layout change)
+ *  2. on toggle, covers the page with the "from" image, flips the live DOM underneath,
+ *     spreads the ink, then fades the overlay away onto the already-flipped page
+ *  3. if toggled mid-spread, freezes the frame on screen and spreads the next ink over it
+ *  4. falls back to a CSS colour cross-fade without WebGL2 or with reduced motion
+ */
+export class InkTransition {
+  private readonly renderer: InkRenderer | null;
+  private readonly toggleButton: HTMLButtonElement | null;
+  private readonly icon: ThemeIcon | null;
+  private readonly state = { progress: 0, time: 0 };
+  private tween: gsap.core.Tween | null = null;
+  private fade: gsap.core.Tween | null = null;
+  private frame: ActiveFrame | null = null;
+  private cssFadeTimer = 0;
+  private replayTimer = 0;
+  private last: ClickRecord | null = null;
+
+  private captureGen = 0;
+  private capturing = false;
+  private captureQueued = false;
+  private resizeTimer = 0;
+
+  constructor(canvas: HTMLCanvasElement, toggleButton: HTMLButtonElement | null, opts: { webgl?: boolean } = {}) {
+    this.toggleButton = toggleButton;
+    this.icon = toggleButton ? new ThemeIcon(toggleButton) : null;
+    this.icon?.set(getTheme());
+
+    this.renderer = opts.webgl === false ? null : InkRenderer.create(canvas);
+    if (!this.renderer) {
+      document.documentElement.dataset.ink = 'css';
+      return;
+    }
+    document.documentElement.dataset.ink = 'webgl';
+
+    this.renderer.resize(renderScale());
+    this.renderer.watchContext(
+      () => this.cancel(),
+      () => this.scheduleCapture(0),
+    );
+
+    window.addEventListener('resize', () => {
+      this.renderer?.resize(renderScale());
+      if (this.frame) this.draw();
+      this.scheduleCapture(RESIZE_DEBOUNCE_MS);
+    });
+    // Catches document-height changes that aren't window resizes (late fonts, images).
+    new ResizeObserver(() => this.scheduleCapture(RESIZE_DEBOUNCE_MS)).observe(document.body);
+    // Snapshots are skipped under reduced motion; take them if the preference is lifted.
+    reducedMotion.addEventListener('change', () => this.scheduleCapture(0));
+
+    void document.fonts.ready.then(() => this.scheduleCapture(0));
+  }
+
+  get isWebGL(): boolean {
+    return this.renderer !== null;
+  }
+
+  get isAnimating(): boolean {
+    return this.frame !== null;
+  }
+
+  /** The most recent click, for "replay last click". */
+  get lastClick(): ClickRecord | null {
+    return this.last;
+  }
+
+  /**
+   * Toggle the theme, spreading from `point` (viewport CSS px) or from the toggle button.
+   * `seed` reproduces a previous spread exactly.
+   */
+  toggle(point?: Point, seed?: InkFrame['seed']): void {
+    window.clearTimeout(this.replayTimer);
+    // The live DOM always holds the latest target, so this is right even mid-transition.
+    const to = otherTheme(getTheme());
+    const renderer = this.renderer;
+    const scale = renderScale();
+    const key = layoutKey(scale);
+    const interrupting = this.frame !== null;
+
+    const canAnimate =
+      renderer !== null &&
+      !renderer.isLost &&
+      !reducedMotion.matches &&
+      renderer.hasValid(to, key) &&
+      (interrupting || renderer.hasValid(getTheme(), key));
+
+    if (!canAnimate || !renderer) {
+      this.cancel();
+      this.crossFade(to);
+      if (renderer && !reducedMotion.matches) this.scheduleCapture(0);
+      return;
+    }
+
+    // Interrupted: freeze exactly what is on screen and spread the new ink over it.
+    let from: InkSource = getTheme();
+    if (interrupting) {
+      this.tween?.kill();
+      this.fade?.kill();
+      this.tween = this.fade = null;
+      renderer.resize(scale);
+      const frozen = this.currentFrame();
+      from = frozen && renderer.freeze(frozen) ? 'composite' : getTheme();
+    }
+
+    const center = point ?? this.toggleCenter();
+    const maxDist = farthestCorner(center);
+    const frameSeed = seed ?? randomSeed();
+    this.last = { point: center, seed: frameSeed, from: otherTheme(to) };
+    this.frame = { from, to, center, maxDist, seed: frameSeed };
+    this.state.progress = 0;
+    this.state.time = 0;
+
+    const chromeFrom = this.icon?.readChrome();
+    renderer.resize(scale);
+    this.draw();
+    // Same task: the overlay (showing "from") and the flipped DOM hit the screen together.
+    gsap.set(renderer.canvas, { opacity: 1 });
+    renderer.canvas.classList.add('is-active');
+    applyTheme(to, this.toggleButton);
+
+    const duration = inkParams.duration;
+    this.icon?.morphTo(to, {
+      duration,
+      ease: EASE,
+      timeScale: inkParams.timeScale,
+      chromeFrom,
+      chromeDelay: this.inkArrival(center, maxDist, this.toggleCenter()) * duration,
+    });
+
+    this.tween = gsap.to(this.state, {
+      progress: 1,
+      duration,
+      ease: EASE,
+      onUpdate: () => {
+        // Tween-local seconds: slow motion slows the drift too, so it looks identical.
+        this.state.time = this.tween?.time() ?? 0;
+        this.draw();
+      },
+      onComplete: () => this.finish(),
+    });
+    this.tween.timeScale(inkParams.timeScale);
+  }
+
+  /**
+   * Re-run the last click: snap back to the theme it started from, hold briefly (a clean
+   * first frame for the recording), then spread again with the same point and seed.
+   */
+  replay(): boolean {
+    const last = this.last;
+    if (!last) return false;
+    window.clearTimeout(this.replayTimer);
+    this.cancel();
+    this.icon?.kill();
+    if (getTheme() !== last.from) {
+      applyTheme(last.from, this.toggleButton);
+      this.icon?.set(last.from);
+    }
+    this.replayTimer = window.setTimeout(() => this.toggle(last.point, last.seed), REPLAY_HOLD_MS);
+    return true;
+  }
+
+  /** Live playback rate (slow motion), applied to a running transition too. */
+  setTimeScale(scale: number): void {
+    inkParams.timeScale = scale;
+    this.tween?.timeScale(scale);
+    this.fade?.timeScale(scale);
+    this.icon?.setTimeScale(scale);
+  }
+
+  private currentFrame(): InkFrame | null {
+    if (!this.frame) return null;
+    const { progress, time } = this.state;
+    const { maxDist } = this.frame;
+    const linear = Math.min(1, time / inkParams.duration);
+    const ramp = Math.max(0, (linear - SPREAD.cleanupFrom) / (1 - SPREAD.cleanupFrom));
+    // Second term only acts in the last ~3% (≈40ms): a guarantee for unlucky seeds so the
+    // final frame is exactly the "to" snapshot before the fade (measured residual is 0).
+    const cleanup =
+      ramp ** SPREAD.cleanupPow * maxDist * SPREAD.cleanupReach + Math.max(0, (linear - 0.97) / 0.03) * maxDist;
+    return { ...this.frame, progress, time, radius: progress * maxDist * SPREAD.growth, cleanup };
+  }
+
+  private draw(): void {
+    const frame = this.currentFrame();
+    if (this.renderer && frame) this.renderer.draw(frame);
+  }
+
+  private finish(): void {
+    const canvas = this.renderer?.canvas;
+    this.tween = null;
+    if (!canvas) return;
+    this.fade = gsap
+      .to(canvas, { opacity: 0, duration: FADE_OUT, ease: 'none', onComplete: () => this.hide() })
+      .timeScale(inkParams.timeScale);
+  }
+
+  private hide(): void {
+    this.fade = null;
+    this.frame = null;
+    this.renderer?.canvas.classList.remove('is-active');
+    if (this.captureQueued) this.scheduleCapture(0);
+  }
+
+  private cancel(): void {
+    if (!this.frame) return;
+    this.tween?.kill();
+    this.fade?.kill();
+    this.tween = null;
+    this.hide();
+  }
+
+  /** Plain CSS colour transition (no WebGL2, reduced motion, or snapshots not ready yet). */
+  private crossFade(to: Theme): void {
+    const root = document.documentElement;
+    const motion = !reducedMotion.matches;
+    root.classList.add('theme-fade');
+    root.style.setProperty('--theme-fade', `${CSS_FADE_S}s`);
+    applyTheme(to, this.toggleButton);
+    if (motion) {
+      this.icon?.morphTo(to, { duration: CSS_FADE_S * 1.6, ease: 'power2.inOut', timeScale: 1 });
+    } else {
+      this.icon?.set(to);
+    }
+    window.clearTimeout(this.cssFadeTimer);
+    this.cssFadeTimer = window.setTimeout(() => {
+      root.classList.remove('theme-fade');
+      if (this.captureQueued) this.scheduleCapture(0);
+    }, CSS_FADE_S * 1000 + 50);
+  }
+
+  /**
+   * Fraction of the duration at which the base ink front reaches `target` (the eased
+   * radius inverted; slightly early, since the noise lets the front lead).
+   */
+  private inkArrival(center: Point, maxDist: number, target: Point): number {
+    const dist = Math.hypot(target.x - center.x, target.y - center.y);
+    if (dist < 28) return 0;
+    const p = Math.min(1, dist / (maxDist * SPREAD.growth * 1.15));
+    // Inverse of power3.out, capped: the end-of-spread cleanup sweeps the last corners by ~85%.
+    return Math.min(0.85, 1 - Math.cbrt(1 - p));
+  }
+
+  private toggleCenter(): Point {
+    const r = this.toggleButton?.getBoundingClientRect();
+    if (!r) return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+
+  // ---------- Capture scheduling ----------
+
+  private scheduleCapture(delay: number): void {
+    window.clearTimeout(this.resizeTimer);
+    this.resizeTimer = window.setTimeout(() => void this.captureAll(), delay);
+  }
+
+  private async captureAll(): Promise<void> {
+    const renderer = this.renderer;
+    if (!renderer || renderer.isLost || reducedMotion.matches) return;
+
+    // Capturing blocks the main thread; never do it mid-animation (or mid CSS fade, which
+    // would bake half-transitioned colours into the snapshot).
+    if (this.capturing || this.frame || document.documentElement.classList.contains('theme-fade')) {
+      this.captureQueued = true;
+      return;
+    }
+
+    const scale = renderScale();
+    const key = layoutKey(scale);
+    const current = getTheme();
+    const themes: Theme[] = [current, otherTheme(current)].filter((t) => !renderer.hasValid(t, key));
+    this.captureQueued = false;
+    if (themes.length === 0) return;
+
+    const gen = ++this.captureGen;
+    this.capturing = true;
+    try {
+      for (const theme of themes) {
+        const snap = await capturePage(theme, scale, renderer.maxTextureSize);
+        if (gen !== this.captureGen) return;
+        if (snap.key !== layoutKey(renderScale())) {
+          // Layout changed while capturing; this snapshot is already stale.
+          this.captureQueued = true;
+          break;
+        }
+        renderer.upload(snap);
+        if (import.meta.env.DEV) {
+          console.debug(
+            `[ink] captured ${theme} ${snap.canvas.width}×${snap.canvas.height} in ${snap.ms.toFixed(0)}ms`,
+          );
+        }
+      }
+    } catch (err) {
+      console.error('[ink] capture failed', err);
+    } finally {
+      this.capturing = false;
+    }
+    if (this.captureQueued) this.scheduleCapture(RESIZE_DEBOUNCE_MS);
+  }
+}
+
+function farthestCorner(p: Point): number {
+  const w = document.documentElement.clientWidth;
+  const h = document.documentElement.clientHeight;
+  return Math.max(Math.hypot(p.x, p.y), Math.hypot(w - p.x, p.y), Math.hypot(p.x, h - p.y), Math.hypot(w - p.x, h - p.y)) + 4;
+}
+
+function randomSeed(): InkFrame['seed'] {
+  return { x: Math.random() * 64 - 32, y: Math.random() * 64 - 32, angle: Math.random() * Math.PI * 2 };
+}
+
+===== END FILE: src/ui/inkTransition.ts =====
+
+===== FILE: src/capture/capture.ts =====
+import type { Theme } from '../ui/theme';
+
+/**
+ * Full-document snapshots of the page in a given theme.
+ *
+ * We capture the whole document (not just the viewport) so a snapshot stays valid
+ * while the user scrolls; the shader picks the visible window using the live scroll
+ * offset. The theme is applied to html2canvas' *cloned* document via `onclone`, so the
+ * live page never flickers during pre-capture.
+ */
+
+export interface Snapshot {
+  theme: Theme;
+  canvas: HTMLCanvasElement;
+  /** Texture pixels per CSS pixel. */
+  scale: number;
+  /** Layout this snapshot is valid for; see {@link layoutKey}. */
+  key: string;
+  ms: number;
+}
+
+const BACKGROUND: Record<Theme, string> = {
+  light: '#f6f4ef',
+  dark: '#0b0b0f',
+};
+
+const isCoarsePointer = (): boolean => window.matchMedia('(pointer: coarse)').matches;
+
+/** Device-pixel ratio used for both the snapshots and the overlay canvas. */
+export function renderScale(): number {
+  const cap = isCoarsePointer() ? 1.5 : 2;
+  return Math.min(window.devicePixelRatio || 1, cap);
+}
+
+export function documentSize(): { width: number; height: number } {
+  const el = document.documentElement;
+  return { width: el.clientWidth, height: Math.max(el.scrollHeight, el.clientHeight) };
+}
+
+/**
+ * Identifies the layout a snapshot depends on. Viewport height is deliberately
+ * excluded (mobile URL-bar show/hide changes it without reflowing the document).
+ */
+export function layoutKey(scale: number): string {
+  const { width, height } = documentSize();
+  return `${width}x${height}@${scale}`;
+}
+
+export async function capturePage(theme: Theme, scale: number, maxTextureSize: number): Promise<Snapshot> {
+  const t0 = performance.now();
+  const key = layoutKey(scale);
+  const { width, height } = documentSize();
+
+  // Never exceed what the GPU can hold; the shader handles scale != canvas DPR.
+  const safeScale = Math.min(scale, maxTextureSize / width, maxTextureSize / height);
+
+  // Lazy-loaded: html2canvas is ~200 KB and only needed after first paint.
+  const { default: html2canvas } = await import('html2canvas');
+  const canvas = await html2canvas(document.body, {
+    scale: safeScale,
+    backgroundColor: BACKGROUND[theme],
+    x: 0,
+    y: 0,
+    width,
+    height,
+    scrollX: 0,
+    scrollY: 0,
+    // The clone iframe renders without a scrollbar, so give it the live page's
+    // scrollbar-less width; otherwise centred content shifts by half a scrollbar.
+    windowWidth: width,
+    windowHeight: document.documentElement.clientHeight,
+    logging: false,
+    useCORS: true,
+    onclone: (doc) => {
+      doc.documentElement.dataset.theme = theme;
+      // The live toggle is drawn above the overlay, so leave a hole for it. `visibility`
+      // (not data-html2canvas-ignore) keeps its box in the layout so the nav doesn't shift.
+      doc.querySelectorAll<HTMLElement>('[data-ink-live]').forEach((el) => {
+        el.style.visibility = 'hidden';
+      });
+    },
+  });
+
+  return { theme, canvas, scale: safeScale, key, ms: performance.now() - t0 };
+}
+
+===== END FILE: src/capture/capture.ts =====
+
+===== FILE: src/gl/params.ts =====
+import type { Theme } from '../ui/theme';
+
+/** Live-tunable look of the ink. Mutated by the demo panel (phase 5). */
+export interface InkParams {
+  /** Seconds for the spread (before the 150ms fade). */
+  duration: number;
+  /** Tendril reach multiplier, 0 = clean blob. */
+  tendril: number;
+  /** Noise frequency multiplier: lower = bigger, lazier shapes. */
+  noiseScale: number;
+  /** Frontier half-width in CSS px. */
+  softness: number;
+  /** Speed at which the shape evolves during the spread. */
+  drift: number;
+  /** Global playback rate (0.25 for slow motion). */
+  timeScale: number;
+}
+
+export const inkParams: InkParams = {
+  duration: 1.4,
+  tendril: 1,
+  noiseScale: 1,
+  softness: 1.4,
+  drift: 1,
+  timeScale: 1,
+};
+
+/** Pigment colour pooled at the frontier, keyed by the theme being revealed. */
+export const RIM_COLOR: Record<Theme, [number, number, number]> = {
+  dark: [0.0, 0.0, 0.01], // ink: a touch denser than the #0b0b0f page
+  light: [1.0, 0.996, 0.985], // bleach: a touch brighter than #f6f4ef
+};
+
+===== END FILE: src/gl/params.ts =====
+
+===== FILE: src/gl/program.ts =====
+function compile(gl: WebGL2RenderingContext, type: GLenum, source: string): WebGLShader {
+  const shader = gl.createShader(type);
+  if (!shader) throw new Error('createShader failed');
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS) && !gl.isContextLost()) {
+    const log = gl.getShaderInfoLog(shader) ?? '';
+    gl.deleteShader(shader);
+    throw new Error(`Shader compile error:\n${log}`);
+  }
+  return shader;
+}
+
+export interface Program {
+  program: WebGLProgram;
+  uniform(name: string): WebGLUniformLocation | null;
+}
+
+export function createProgram(gl: WebGL2RenderingContext, vert: string, frag: string): Program {
+  const program = gl.createProgram();
+  if (!program) throw new Error('createProgram failed');
+  const vs = compile(gl, gl.VERTEX_SHADER, vert);
+  const fs = compile(gl, gl.FRAGMENT_SHADER, frag);
+  gl.attachShader(program, vs);
+  gl.attachShader(program, fs);
+  gl.linkProgram(program);
+  gl.deleteShader(vs);
+  gl.deleteShader(fs);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS) && !gl.isContextLost()) {
+    throw new Error(`Program link error:\n${gl.getProgramInfoLog(program) ?? ''}`);
+  }
+
+  const cache = new Map<string, WebGLUniformLocation | null>();
+  return {
+    program,
+    uniform(name) {
+      if (!cache.has(name)) cache.set(name, gl.getUniformLocation(program, name));
+      return cache.get(name) ?? null;
+    },
+  };
+}
+
+===== END FILE: src/gl/program.ts =====
+
+===== FILE: src/gl/noiseTexture.ts =====
+/**
+ * Tileable gradient-noise texture, so the shader pays one bilinear fetch per octave
+ * instead of four hashes + dot products.
+ *
+ * Layout: SIZE×SIZE texels, CELLS×CELLS lattice cells (one noise unit = SIZE/CELLS
+ * texels, comfortably smooth under bilinear filtering). Four decorrelated channels.
+ * Values are mapped from [-1, 1] to [0, 255].
+ */
+export const NOISE_SIZE = 256;
+export const NOISE_CELLS = 32;
+
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function channel(rand: () => number): Float32Array {
+  const gx = new Float32Array(NOISE_CELLS * NOISE_CELLS);
+  const gy = new Float32Array(NOISE_CELLS * NOISE_CELLS);
+  for (let i = 0; i < gx.length; i++) {
+    const a = rand() * Math.PI * 2;
+    gx[i] = Math.cos(a);
+    gy[i] = Math.sin(a);
+  }
+  const texelsPerCell = NOISE_SIZE / NOISE_CELLS;
+  const out = new Float32Array(NOISE_SIZE * NOISE_SIZE);
+  const fade = (t: number): number => t * t * t * (t * (t * 6 - 15) + 10);
+  const at = (cx: number, cy: number): number =>
+    ((cy + NOISE_CELLS) % NOISE_CELLS) * NOISE_CELLS + ((cx + NOISE_CELLS) % NOISE_CELLS);
+
+  for (let y = 0; y < NOISE_SIZE; y++) {
+    // Texel centres, so bilinear sampling reproduces the continuous function.
+    const py = (y + 0.5) / texelsPerCell;
+    const cy = Math.floor(py);
+    const fy = py - cy;
+    const v = fade(fy);
+    for (let x = 0; x < NOISE_SIZE; x++) {
+      const px = (x + 0.5) / texelsPerCell;
+      const cx = Math.floor(px);
+      const fx = px - cx;
+      const u = fade(fx);
+      const i00 = at(cx, cy);
+      const i10 = at(cx + 1, cy);
+      const i01 = at(cx, cy + 1);
+      const i11 = at(cx + 1, cy + 1);
+      const n00 = gx[i00]! * fx + gy[i00]! * fy;
+      const n10 = gx[i10]! * (fx - 1) + gy[i10]! * fy;
+      const n01 = gx[i01]! * fx + gy[i01]! * (fy - 1);
+      const n11 = gx[i11]! * (fx - 1) + gy[i11]! * (fy - 1);
+      const nx0 = n00 + (n10 - n00) * u;
+      const nx1 = n01 + (n11 - n01) * u;
+      out[y * NOISE_SIZE + x] = nx0 + (nx1 - nx0) * v;
+    }
+  }
+  // Normalise to roughly [-1, 1] (2D Perlin peaks near ±0.7).
+  for (let i = 0; i < out.length; i++) out[i] = Math.max(-1, Math.min(1, out[i]! * 1.45));
+  return out;
+}
+
+export function createNoiseTexture(gl: WebGL2RenderingContext): WebGLTexture {
+  const rand = mulberry32(0x1b1eed); // fixed: per-click variety comes from uSeed
+  const channels = [channel(rand), channel(rand), channel(rand), channel(rand)];
+  const data = new Uint8Array(NOISE_SIZE * NOISE_SIZE * 4);
+  for (let i = 0; i < NOISE_SIZE * NOISE_SIZE; i++) {
+    for (let c = 0; c < 4; c++) {
+      data[i * 4 + c] = Math.round((channels[c]![i]! * 0.5 + 0.5) * 255);
+    }
+  }
+  const tex = gl.createTexture();
+  if (!tex) throw new Error('createTexture failed');
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, NOISE_SIZE, NOISE_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+  return tex;
+}
+
+===== END FILE: src/gl/noiseTexture.ts =====
+
+===== FILE: src/gl/shaders.ts =====
+import { NOISE_CELLS } from './noiseTexture';
+
+/** Fullscreen triangle generated from gl_VertexID — no buffers needed. */
+export const FULLSCREEN_VERT = /* glsl */ `#version 300 es
+void main() {
+  vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
+  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
+}
+`;
+
+/**
+ * Ink bleed between two full-document snapshots.
+ *
+ * Coordinate spaces:
+ *  - device px:  gl_FragCoord, flipped to top-left origin
+ *  - CSS px:     device px / uCanvasScale (viewport-relative)
+ *  - texture px: device px * map.x + map.yz (scale ratio + scroll offset in whole texels);
+ *                map.w = 1 flips Y for framebuffer-rendered sources (the frozen composite)
+ *  - noise space: (CSS px - click) / uRef, so the pattern scales with the viewport
+ *
+ * The mask is a signed field f in CSS px (f < 0 = inked):
+ *   f = d - R * reach(p)  - tendrils(p)  + fibre(p)  - cleanup
+ *  reach    : domain-warped fbm (big irregular blob) + direction-only fbm (anisotropic
+ *             lobes, so the drop is irregular even while tiny)
+ *  tendrils : ridged fbm sampled on the unit direction, offset by distance so the
+ *             ridges curl and branch as they travel outward
+ *  fibre    : static screen-space noise (paper fibres) that feathers the frontier
+ *  cleanup  : guarantees full coverage as progress -> 1
+ */
+export const INK_FRAG = /* glsl */ `#version 300 es
+precision highp float;
+precision highp int;
+
+uniform sampler2D uFrom;
+uniform sampler2D uTo;
+uniform vec2 uFromSize;     // texture px
+uniform vec2 uToSize;       // texture px
+uniform vec4 uFromMap;      // (texture px per device px, offset x, offset y, flipY)
+uniform vec4 uToMap;
+uniform float uCanvasScale; // device px per CSS px
+uniform vec2 uRes;          // canvas device px
+
+uniform vec2 uCenter;       // CSS px, viewport-relative
+uniform float uRadius;      // CSS px, eased base radius
+uniform float uCleanup;     // CSS px, extra uniform reach that guarantees full coverage at the end
+uniform float uTime;        // seconds since click (scaled by slow-mo)
+uniform float uRef;         // CSS px, noise reference length (max viewport side)
+uniform vec2 uSeed;
+uniform mat2 uSeedRot;
+
+uniform float uTendril;     // tendril intensity, 0..2
+uniform float uNoiseScale;  // noise frequency multiplier
+uniform float uSoftness;    // frontier half-width, CSS px
+uniform float uDrift;       // time evolution speed
+uniform vec3 uRimColor;     // pigment colour pooled at the frontier
+
+out vec4 outColor;
+
+// Shape budget: how far (relative to R) the blob may lead / lag the base circle.
+const float A_LOBE = 0.22;
+const float A_BLOB = 0.20;
+const float A_SUM = A_LOBE + A_BLOB;
+const float TENDRIL_REACH = 0.24; // x R x uTendril
+const float FIBRE_PX = 1.8;
+const float THIN_MAX_PX = 26.0;
+const float SPECK_PX = 18.0;
+const float HAZE_PX = 16.0; // must stay <= SPECK_PX (outer bound)
+
+// ---------- noise ----------
+
+// Precomputed tileable gradient noise (see noiseTexture.ts): one lattice unit per
+// 1/NOISE_CELLS of the texture. textureLod keeps sampling independent of derivatives,
+// which are undefined inside the early-out branches above.
+uniform sampler2D uNoise;
+const float INV_CELLS = 1.0 / ${NOISE_CELLS.toFixed(1)};
+
+// Gradient noise, roughly [-1, 1].
+float gnoise(vec2 p) {
+  return textureLod(uNoise, p * INV_CELLS, 0.0).r * 2.0 - 1.0;
+}
+
+// Second, decorrelated channel (fibres, speckles).
+float gnoise2(vec2 p) {
+  return textureLod(uNoise, p * INV_CELLS, 0.0).g * 2.0 - 1.0;
+}
+
+const mat2 OCT = mat2(0.8, 0.6, -0.6, 0.8) * 2.03;
+
+float fbm3(vec2 p) {
+  float s = 0.0, a = 0.5;
+  for (int i = 0; i < 3; i++) { s += a * gnoise(p); p = OCT * p + 17.13; a *= 0.5; }
+  return s / 0.875;
+}
+
+float fbm4(vec2 p) {
+  float s = 0.0, a = 0.5;
+  for (int i = 0; i < 4; i++) { s += a * gnoise(p); p = OCT * p + 17.13; a *= 0.5; }
+  return s / 0.9375;
+}
+
+float fbm5(vec2 p) {
+  float s = 0.0, a = 0.5;
+  for (int i = 0; i < 5; i++) { s += a * gnoise(p); p = OCT * p + 17.13; a *= 0.5; }
+  return s / 0.96875;
+}
+
+// ---------- snapshots ----------
+
+vec3 sampleDoc(sampler2D tex, vec2 size, vec4 map, vec2 devPx) {
+  vec2 texPx = devPx * map.x + map.yz;
+  if (map.w > 0.5) texPx.y = size.y - texPx.y;
+  vec2 uv = clamp(texPx, vec2(0.5), size - 0.5) / size;
+  return texture(tex, uv).rgb;
+}
+
+void main() {
+  vec2 devPx = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
+  vec2 css = devPx / uCanvasScale;
+  vec2 rel = css - uCenter;
+  float d = length(rel);
+  float R = uRadius;
+  float cleanup = uCleanup;
+
+  // Conservative bounds on f: skip the noise entirely far from the frontier.
+  float inner = R * (1.0 - A_SUM) + cleanup - FIBRE_PX - THIN_MAX_PX - uSoftness * 2.0;
+  float outer = R * (1.0 + A_SUM) * (1.0 + TENDRIL_REACH * uTendril) + cleanup + FIBRE_PX + SPECK_PX + uSoftness * 2.0;
+  if (d < inner) {
+    outColor = vec4(sampleDoc(uTo, uToSize, uToMap, devPx), 1.0);
+    return;
+  }
+  if (d > outer) {
+    outColor = vec4(sampleDoc(uFrom, uFromSize, uFromMap, devPx), 1.0);
+    return;
+  }
+
+  float t = uTime * uDrift;
+  vec2 p = rel / uRef;
+  vec2 dir = uSeedRot * (rel / max(d, 1e-3));
+  float ns = uNoiseScale;
+
+  // Domain warp, evolving over time so the edge boils rather than scales.
+  vec2 q = p * (2.4 * ns) + uSeed;
+  vec2 w = vec2(
+    fbm3(q + vec2(0.0, 0.31 * t)),
+    fbm3(q + vec2(5.2, 1.3) - vec2(0.27 * t, 0.0))
+  );
+
+  // Large irregular blob (warped fbm in page space: lazy at small radii, rich at large)
+  // + smooth direction-only lobes so even a tiny drop is lopsided (anisotropy).
+  float blob = fbm5(q + 2.3 * w + vec2(0.12 * t, -0.08 * t));
+  vec2 lq = dir * 0.9 + uSeed.yx * 0.37 + vec2(0.06 * t);
+  float lobes = gnoise(lq) * 0.75 + gnoise(lq * 2.1 + 9.1) * 0.25;
+  float reach = clamp(1.0 + A_LOBE * 1.6 * lobes + A_BLOB * 1.5 * blob, 1.0 - A_SUM, 1.0 + A_SUM);
+  float f = d - R * reach;
+
+  // Tendrils: thin filaments along the zero-lines of an fbm sampled on the direction
+  // circle. The distance term shifts the lines sideways as they extend (curl), the warp
+  // bends them, and the fbm octaves make them fork. Each filament has a length (varying
+  // per direction) and a width that tapers to a point at the tip.
+  float gate = smoothstep(-0.35, 0.4, fbm3(dir * 1.6 + uSeed * 0.61 + 3.7));
+  vec2 tq = dir * (2.2 * ns) + (d / uRef) * vec2(2.6, -1.9) * ns + 1.2 * w + uSeed * 1.7 + vec2(0.0, 0.18 * t);
+  float n = fbm4(tq);
+  float ridgePx = abs(n) * max(d, 24.0) / (4.0 * ns); // ~px distance to the filament's spine
+  float lenN = gnoise(dir * 3.1 + uSeed * 0.43 + vec2(0.1 * t)) * 0.5 + 0.5;
+  float L = uTendril * TENDRIL_REACH * R * gate * (0.35 + 0.65 * lenN);
+  float along = clamp(f / max(L, 1.0), 0.0, 1.0); // 0 at the blob edge, 1 at the tip
+  float width = clamp(R * 0.022, 1.5, 9.0) * (1.0 - along * along) * gate;
+  float ft = max(f - L, ridgePx - width);
+  // Smooth union: filaments flare into the blob instead of meeting it at a crease.
+  float k = 6.0;
+  float hh = clamp(0.5 + 0.5 * (ft - f) / k, 0.0, 1.0);
+  f = mix(ft, f, hh) - k * hh * (1.0 - hh);
+
+  // Paper fibres: static in screen space so they don't shimmer.
+  vec2 fq = css * 0.34 + uSeed * 13.0;
+  float fibre = gnoise2(fq) * 0.65 + gnoise2(OCT * fq + 5.3) * 0.35; // rotated octave hides the 32-unit tile
+  f += fibre * FIBRE_PX;
+
+  f -= cleanup;
+
+  // ---------- compositing ----------
+  float soft = max(uSoftness, 0.6);
+  float inked = 1.0 - smoothstep(-soft, soft, f);
+
+  // Ink thins just behind the frontier: ~0.6 density, rising to solid. Width varies with
+  // the blob noise so the band never reads as a uniform outline.
+  float thinW = mix(3.0, THIN_MAX_PX, clamp(blob * 0.8 + 0.3, 0.0, 1.0));
+  float density = mix(0.6, 1.0, smoothstep(0.0, thinW, -f));
+  float cov = inked * density;
+
+  // Diffusion haze: a faint translucent gradient just ahead of the hard frontier, patchy
+  // (driven by the fibre noise) so it reads as pigment bleeding into wet paper.
+  float hazeW = mix(4.0, HAZE_PX, clamp(0.5 + 0.5 * blob, 0.0, 1.0));
+  float haze = (1.0 - smoothstep(0.0, hazeW, f)) * smoothstep(-0.3, 0.6, 0.35 * fibre + w.x);
+  cov = max(cov, haze * 0.24 * step(0.0, f));
+
+  // Speckles: isolated droplets just ahead of the frontier, rarer with distance.
+  float ahead = clamp(f / SPECK_PX, 0.0, 1.0);
+  if (f > 0.0 && ahead < 1.0) {
+    float sn = gnoise2(css * 0.55 + uSeed * 7.0 + 41.0) * 0.5 + 0.5;
+    float th = mix(0.80, 0.96, ahead);
+    cov = max(cov, smoothstep(th, th + 0.04, sn) * 0.75 * (1.0 - ahead));
+  }
+
+  vec3 from = sampleDoc(uFrom, uFromSize, uFromMap, devPx);
+  vec3 to = sampleDoc(uTo, uToSize, uToMap, devPx);
+  vec3 col = mix(from, to, cov);
+
+  // Pigment rim pooled at the frontier (darker for ink, brighter for bleach).
+  float rimX = (f + soft * 1.1) / (soft * 1.4 + 1.2);
+  float rim = exp(-rimX * rimX) * inked;
+  col = mix(col, uRimColor, rim * 0.45);
+
+  outColor = vec4(col, 1.0);
+}
+`;
+
+===== END FILE: src/gl/shaders.ts =====
+
+===== FILE: src/gl/renderer.ts =====
+import type { Snapshot } from '../capture/capture';
+import type { Theme } from '../ui/theme';
+import { createProgram, type Program } from './program';
+import { createNoiseTexture } from './noiseTexture';
+import { inkParams, RIM_COLOR } from './params';
+import { FULLSCREEN_VERT, INK_FRAG } from './shaders';
+
+interface ThemeTexture {
+  texture: WebGLTexture;
+  width: number;
+  height: number;
+  scale: number;
+  key: string;
+}
+
+/** Offscreen copy of what the overlay showed when a transition was interrupted. */
+interface CompositeTexture {
+  texture: WebGLTexture;
+  framebuffer: WebGLFramebuffer;
+  width: number;
+  height: number;
+  /** Page scroll (CSS px) at the moment it was rendered. */
+  scrollX: number;
+  scrollY: number;
+}
+
+/** What the ink spreads *over*: a theme snapshot, or the frozen mid-transition frame. */
+export type InkSource = Theme | 'composite';
+
+export interface InkFrame {
+  from: InkSource;
+  to: Theme;
+  /** Click point, CSS px relative to the viewport. */
+  center: { x: number; y: number };
+  /** Eased 0..1. */
+  progress: number;
+  /** Base radius, CSS px. */
+  radius: number;
+  /** Uniform extra reach used to finish off lagging corners, CSS px. */
+  cleanup: number;
+  /** Distance from the click to the farthest viewport corner, CSS px. */
+  maxDist: number;
+  /** Seconds since the click (already slow-mo scaled). */
+  time: number;
+  /** Per-click randomness. */
+  seed: { x: number; y: number; angle: number };
+}
+
+interface Sampler {
+  texture: WebGLTexture;
+  width: number;
+  height: number;
+  /** Texture px per canvas device px. */
+  ratio: number;
+  /** Texture px added after scaling (scroll), already rounded to whole texels. */
+  offsetX: number;
+  offsetY: number;
+  /** Framebuffer-rendered textures are bottom-up. */
+  flipY: boolean;
+}
+
+/** Owns the overlay canvas, the WebGL2 context and the snapshot / composite textures. */
+export class InkRenderer {
+  readonly canvas: HTMLCanvasElement;
+  readonly maxTextureSize: number;
+
+  private gl: WebGL2RenderingContext;
+  private program!: Program;
+  private vao!: WebGLVertexArrayObject;
+  private noise!: WebGLTexture;
+  private textures = new Map<Theme, ThemeTexture>();
+  private composites: CompositeTexture[] = [];
+  private activeComposite = -1;
+  private canvasScale = 1;
+  private lost = false;
+
+  /** Returns null when WebGL2 is unavailable. */
+  static create(canvas: HTMLCanvasElement): InkRenderer | null {
+    const gl = canvas.getContext('webgl2', {
+      alpha: false, // opaque: CSS opacity fades it straight onto the live DOM
+      antialias: false,
+      depth: false,
+      stencil: false,
+      premultipliedAlpha: false,
+      preserveDrawingBuffer: false,
+      powerPreference: 'high-performance',
+    });
+    if (!gl) return null;
+    try {
+      return new InkRenderer(canvas, gl);
+    } catch (err) {
+      console.error(err);
+      return null;
+    }
+  }
+
+  private constructor(canvas: HTMLCanvasElement, gl: WebGL2RenderingContext) {
+    this.canvas = canvas;
+    this.gl = gl;
+    this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
+    this.init();
+  }
+
+  private init(): void {
+    const gl = this.gl;
+    this.program = createProgram(gl, FULLSCREEN_VERT, INK_FRAG);
+    const vao = gl.createVertexArray();
+    if (!vao) throw new Error('createVertexArray failed');
+    this.vao = vao;
+    this.noise = createNoiseTexture(gl);
+    this.composites = [];
+    this.activeComposite = -1;
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
+  }
+
+  /** Context loss/restore hooks. `onRestored` should re-upload snapshots. */
+  watchContext(onLost: () => void, onRestored: () => void): void {
+    this.canvas.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      this.lost = true;
+      this.textures.clear();
+      this.composites = [];
+      this.activeComposite = -1;
+      onLost();
+    });
+    this.canvas.addEventListener('webglcontextrestored', () => {
+      this.lost = false;
+      this.init();
+      onRestored();
+    });
+  }
+
+  get isLost(): boolean {
+    return this.lost;
+  }
+
+  /** Sizes the backing store to the overlay's CSS box at the given DPR. */
+  resize(scale: number): void {
+    const rect = this.canvas.getBoundingClientRect();
+    const w = Math.max(1, Math.round(rect.width * scale));
+    const h = Math.max(1, Math.round(rect.height * scale));
+    if (this.canvas.width !== w) this.canvas.width = w;
+    if (this.canvas.height !== h) this.canvas.height = h;
+    this.canvasScale = rect.width > 0 ? w / rect.width : scale;
+  }
+
+  upload(snapshot: Snapshot): void {
+    if (this.lost) return;
+    const gl = this.gl;
+    let entry = this.textures.get(snapshot.theme);
+    if (!entry) {
+      entry = { texture: this.createTexture(), width: 0, height: 0, scale: 0, key: '' };
+      this.textures.set(snapshot.theme, entry);
+    }
+    gl.bindTexture(gl.TEXTURE_2D, entry.texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, snapshot.canvas);
+    entry.width = snapshot.canvas.width;
+    entry.height = snapshot.canvas.height;
+    entry.scale = snapshot.scale;
+    entry.key = snapshot.key;
+  }
+
+  /** True when a snapshot for `theme` exists and matches the current layout. */
+  hasValid(theme: Theme, key: string): boolean {
+    return !this.lost && this.textures.get(theme)?.key === key;
+  }
+
+  /**
+   * Renders `frame` (normally: exactly what is on screen) into an offscreen texture that
+   * later frames can use as `from: 'composite'`. Two textures ping-pong, so a frame that
+   * itself reads the composite can be frozen again (rapid triple-clicks).
+   */
+  freeze(frame: InkFrame): boolean {
+    if (this.lost) return false;
+    const gl = this.gl;
+    const index = this.activeComposite === 0 ? 1 : 0;
+    const target = this.ensureComposite(index);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
+    const ok = this.render(frame);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    if (!ok) return false;
+    target.scrollX = window.scrollX;
+    target.scrollY = window.scrollY;
+    this.activeComposite = index;
+    return true;
+  }
+
+  draw(frame: InkFrame): void {
+    if (this.lost) return;
+    this.render(frame);
+  }
+
+  // ---------- internals ----------
+
+  private createTexture(): WebGLTexture {
+    const gl = this.gl;
+    const texture = gl.createTexture();
+    if (!texture) throw new Error('createTexture failed');
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return texture;
+  }
+
+  private ensureComposite(index: number): CompositeTexture {
+    const gl = this.gl;
+    const { width, height } = this.canvas;
+    let c = this.composites[index];
+    if (!c) {
+      const framebuffer = gl.createFramebuffer();
+      if (!framebuffer) throw new Error('createFramebuffer failed');
+      c = { texture: this.createTexture(), framebuffer, width: 0, height: 0, scrollX: 0, scrollY: 0 };
+      this.composites[index] = c;
+    }
+    if (c.width !== width || c.height !== height) {
+      gl.bindTexture(gl.TEXTURE_2D, c.texture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, c.framebuffer);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, c.texture, 0);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      c.width = width;
+      c.height = height;
+    }
+    return c;
+  }
+
+  private sampler(source: InkSource): Sampler | null {
+    if (source === 'composite') {
+      const c = this.composites[this.activeComposite];
+      if (!c) return null;
+      // Keep the frozen frame glued to the page if the user scrolls mid-transition.
+      return {
+        texture: c.texture,
+        width: c.width,
+        height: c.height,
+        ratio: 1,
+        offsetX: Math.round((window.scrollX - c.scrollX) * this.canvasScale),
+        offsetY: Math.round((window.scrollY - c.scrollY) * this.canvasScale),
+        flipY: true,
+      };
+    }
+    const t = this.textures.get(source);
+    if (!t) return null;
+    return {
+      texture: t.texture,
+      width: t.width,
+      height: t.height,
+      ratio: t.scale / this.canvasScale,
+      offsetX: Math.floor(window.scrollX * t.scale + 0.5),
+      offsetY: Math.floor(window.scrollY * t.scale + 0.5),
+      flipY: false,
+    };
+  }
+
+  private render(frame: InkFrame): boolean {
+    const from = this.sampler(frame.from);
+    const to = this.sampler(frame.to);
+    if (!from || !to) return false;
+
+    const gl = this.gl;
+    const { program, uniform } = this.program;
+    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    gl.useProgram(program);
+    gl.bindVertexArray(this.vao);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, from.texture);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, to.texture);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, this.noise);
+
+    gl.uniform1i(uniform('uFrom'), 0);
+    gl.uniform1i(uniform('uTo'), 1);
+    gl.uniform1i(uniform('uNoise'), 2);
+    gl.uniform2f(uniform('uFromSize'), from.width, from.height);
+    gl.uniform2f(uniform('uToSize'), to.width, to.height);
+    gl.uniform4f(uniform('uFromMap'), from.ratio, from.offsetX, from.offsetY, from.flipY ? 1 : 0);
+    gl.uniform4f(uniform('uToMap'), to.ratio, to.offsetX, to.offsetY, to.flipY ? 1 : 0);
+    gl.uniform1f(uniform('uCanvasScale'), this.canvasScale);
+    gl.uniform2f(uniform('uRes'), this.canvas.width, this.canvas.height);
+    gl.uniform2f(uniform('uCenter'), frame.center.x, frame.center.y);
+    gl.uniform1f(uniform('uRadius'), frame.radius);
+    gl.uniform1f(uniform('uCleanup'), frame.cleanup);
+    gl.uniform1f(uniform('uTime'), frame.time);
+    gl.uniform1f(uniform('uRef'), Math.max(this.canvas.width, this.canvas.height) / this.canvasScale);
+    gl.uniform2f(uniform('uSeed'), frame.seed.x, frame.seed.y);
+    const cos = Math.cos(frame.seed.angle);
+    const sin = Math.sin(frame.seed.angle);
+    gl.uniformMatrix2fv(uniform('uSeedRot'), false, [cos, sin, -sin, cos]);
+
+    gl.uniform1f(uniform('uTendril'), inkParams.tendril);
+    gl.uniform1f(uniform('uNoiseScale'), inkParams.noiseScale);
+    gl.uniform1f(uniform('uSoftness'), inkParams.softness);
+    gl.uniform1f(uniform('uDrift'), inkParams.drift);
+    gl.uniform3fv(uniform('uRimColor'), RIM_COLOR[frame.to]);
+
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    return true;
+  }
+}
+
+===== END FILE: src/gl/renderer.ts =====
+

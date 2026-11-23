@@ -1,7 +1,13 @@
 import { useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowRight, ArrowUpRight } from 'lucide-react';
-import { siteConfig, type ProductItem, type ProductStatus } from '../config/siteConfig';
-import { useDocumentMeta } from '../hooks/useDocumentMeta';
+import { seoRoutes } from '../config/site';
+import { siteConfig } from '../config/siteConfig';
+import { products, type Product, type ProductStatus } from '../data/products';
+import {
+  buildLiveProductSchemas,
+  buildOrganizationSchema,
+  buildWebSiteSchema,
+} from '../lib/schema';
 import { Button } from '../components/Button';
 import { CTABand } from '../components/CTABand';
 import { FourPointStar } from '../components/Motifs';
@@ -9,7 +15,9 @@ import { ProductCard } from '../components/ProductCard';
 import { ProductModal } from '../components/ProductModal';
 import { Reveal } from '../components/Reveal';
 import { SectionHeader } from '../components/SectionHeader';
+import { Seo } from '../components/Seo';
 import { PlanetaryRing } from '../components/PlanetaryRing';
+import { StitchDivider } from '../components/motion/StitchDivider';
 
 type FilterStatus = 'ALL' | ProductStatus;
 
@@ -21,15 +29,22 @@ const FILTER_OPTIONS: { value: FilterStatus; label: string }[] = [
 ];
 
 export function HomePage() {
-  useDocumentMeta(siteConfig.meta.home);
-
   const heroRef = useRef<HTMLElement | null>(null);
-  const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('ALL');
 
+  const homeSchemas = useMemo(
+    () => [
+      buildOrganizationSchema(),
+      buildWebSiteSchema(),
+      ...buildLiveProductSchemas(products, siteConfig.previewMode),
+    ],
+    []
+  );
+
   const filteredProducts = useMemo(() => {
-    if (statusFilter === 'ALL') return siteConfig.products;
-    return siteConfig.products.filter((item) => item.status === statusFilter);
+    if (statusFilter === 'ALL') return products;
+    return products.filter((item) => item.status === statusFilter);
   }, [statusFilter]);
 
   const scrollToDrop = () => {
@@ -41,6 +56,12 @@ export function HomePage() {
 
   return (
     <>
+      <Seo
+        title={seoRoutes.home.title}
+        description={seoRoutes.home.description}
+        path={seoRoutes.home.path}
+        jsonLd={homeSchemas}
+      />
       {/* 1. Full-viewport editorial hero */}
       <section
         ref={heroRef}
@@ -98,14 +119,18 @@ export function HomePage() {
       {/* 2. Latest Drop grid */}
       <section
         id="latest-drop"
-        className="scroll-mt-20 py-20 sm:py-24 md:py-28 border-b border-charcoal"
+        className="scroll-mt-20 py-20 sm:py-24 md:py-28"
       >
         <div className="max-w-7xl mx-auto px-5 sm:px-8">
           <Reveal>
             <SectionHeader
               kicker={siteConfig.home.latestDrop.kicker}
               title={siteConfig.home.latestDrop.title}
-              subtitle={siteConfig.home.latestDrop.subtitle}
+              subtitle={
+                siteConfig.previewMode
+                  ? siteConfig.home.latestDrop.previewSubtitle
+                  : siteConfig.home.latestDrop.subtitle
+              }
               action={
                 <div
                   role="group"
@@ -157,8 +182,10 @@ export function HomePage() {
         </div>
       </section>
 
+      <StitchDivider />
+
       {/* 3. Short intro strip */}
-      <section className="py-20 sm:py-24 md:py-28 border-b border-charcoal bg-charcoal/20">
+      <section className="py-20 sm:py-24 md:py-28 bg-charcoal/20">
         <Reveal className="max-w-7xl mx-auto px-5 sm:px-8 flex flex-col lg:flex-row lg:items-end justify-between gap-8">
           <div className="space-y-4 max-w-3xl">
             <p className="inline-flex items-center gap-2.5 text-[11px] uppercase tracking-[0.26em] text-steel">
@@ -178,6 +205,8 @@ export function HomePage() {
           </div>
         </Reveal>
       </section>
+
+      <StitchDivider />
 
       {/* 4. What to Expect */}
       <section className="py-20 sm:py-24 md:py-28">
@@ -221,6 +250,8 @@ export function HomePage() {
         </div>
       </section>
 
+      <StitchDivider />
+
       {/* 5. Final CTA band */}
       <CTABand />
 
@@ -232,3 +263,5 @@ export function HomePage() {
     </>
   );
 }
+
+export default HomePage;

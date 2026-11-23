@@ -1,16 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { Menu, Moon, Sun, X, ArrowUpRight } from 'lucide-react';
+import { Menu, X, ArrowUpRight } from 'lucide-react';
 import { siteConfig } from '../config/siteConfig';
-import { useTheme } from '../context/ThemeContext';
+import { getTheme } from '../ui/theme';
 import { Button } from './Button';
 import { FourPointStar } from './Motifs';
 
-export function Navbar() {
+interface NavbarProps {
+  toggleButtonRef: RefObject<HTMLButtonElement | null>;
+  onToggleTheme: () => void;
+}
+
+export function Navbar({ toggleButtonRef, onToggleTheme }: NavbarProps) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const { theme, toggleTheme } = useTheme();
   const location = useLocation();
 
   useEffect(() => {
@@ -46,7 +50,8 @@ export function Navbar() {
   return (
     <>
       <header
-        className={`fixed top-0 inset-x-0 z-40 transition-colors duration-300 ${
+        data-ink-live
+        className={`ink-live-navbar fixed top-0 inset-x-0 z-50 ${
           scrolled || menuOpen
             ? 'bg-noir/95 border-b border-charcoal'
             : 'bg-transparent border-b border-transparent'
@@ -97,17 +102,41 @@ export function Navbar() {
           {/* Zone 3: Theme toggle + primary action (desktop) and mobile menu toggle */}
           <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
             <button
+              ref={toggleButtonRef}
               type="button"
-              onClick={toggleTheme}
-              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="inline-flex items-center justify-center w-11 h-11 md:w-10 md:h-10 border border-charcoal hover:border-ivory text-ivory transition-colors duration-200 cursor-pointer shrink-0"
+              onClick={onToggleTheme}
+              aria-label="Toggle theme"
+              aria-pressed={getTheme() === 'dark'}
+              title="Toggle theme"
+              className="inline-flex items-center justify-center w-11 h-11 md:w-10 md:h-10 border border-charcoal hover:border-ivory bg-transparent text-ivory cursor-pointer shrink-0 focus-visible:outline-1 focus-visible:outline-ivory focus-visible:outline-offset-2"
             >
-              {theme === 'dark' ? (
-                <Sun className="w-4 h-4" aria-hidden="true" />
-              ) : (
-                <Moon className="w-4 h-4" aria-hidden="true" />
-              )}
+              <svg
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                className="w-4 h-4 overflow-visible"
+              >
+                <path
+                  className="theme-toggle__body"
+                  d="M12 7a5 5 0 1 1 0 10a5 5 0 1 1 0-10z"
+                />
+                <g className="theme-toggle__rays">
+                  <line x1="12" y1="1.8" x2="12" y2="3.8" />
+                  <line x1="19.21" y1="4.79" x2="17.8" y2="6.2" />
+                  <line x1="22.2" y1="12" x2="20.2" y2="12" />
+                  <line x1="19.21" y1="19.21" x2="17.8" y2="17.8" />
+                  <line x1="12" y1="22.2" x2="12" y2="20.2" />
+                  <line x1="4.79" y1="19.21" x2="6.2" y2="17.8" />
+                  <line x1="1.8" y1="12" x2="3.8" y2="12" />
+                  <line x1="4.79" y1="4.79" x2="6.2" y2="6.2" />
+                </g>
+              </svg>
             </button>
 
             <div className="hidden md:block">
@@ -152,7 +181,7 @@ export function Navbar() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed inset-0 z-30 bg-noir pt-24 pb-10 px-6 flex flex-col justify-between md:hidden overflow-y-auto"
+            className="fixed inset-0 z-[45] bg-noir pt-24 pb-10 px-6 flex flex-col justify-between md:hidden overflow-y-auto"
           >
             <div className="pt-8">
               <p className="text-[11px] uppercase tracking-[0.26em] text-stone mb-8 flex items-center gap-2.5">

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { FourPointStar } from './Motifs';
+import { MiniRing } from './motion/MiniRing';
 
 interface SectionHeaderProps {
   kicker?: string;
@@ -27,7 +27,7 @@ export function SectionHeader({
           </p>
         )}
         <div className="flex items-center gap-3.5">
-          <FourPointStar className="w-4 h-4 text-ivory shrink-0" />
+          <MiniRing />
           <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-bold uppercase tracking-[-0.02em] leading-none text-ivory">
             {title}
           </h2>

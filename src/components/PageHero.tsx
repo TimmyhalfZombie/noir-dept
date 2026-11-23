@@ -1,23 +1,19 @@
-import { FourPointStar, OrbitalSwoosh } from './Motifs';
+import type { ReactNode } from 'react';
+import { FourPointStar } from './Motifs';
 
 interface PageHeroProps {
   label: string;
   title: string;
   subtitle: string;
+  background?: ReactNode;
 }
 
-export function PageHero({ label, title, subtitle }: PageHeroProps) {
+export function PageHero({ label, title, subtitle, background }: PageHeroProps) {
   return (
-    <section className="relative overflow-hidden border-b border-charcoal pt-32 pb-20 sm:pt-40 sm:pb-24 md:pt-44 md:pb-28">
-      {/* Subtle orbital swoosh motif in background */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -right-24 sm:-right-12 top-1/2 -translate-y-1/2 text-stone/60 opacity-45"
-      >
-        <OrbitalSwoosh className="w-[340px] h-[340px] sm:w-[460px] sm:h-[460px] md:w-[560px] md:h-[560px]" />
-      </div>
+    <section className="relative overflow-hidden pt-32 pb-20 sm:pt-40 sm:pb-24 md:pt-44 md:pb-28">
+      {background}
 
-      <div className="relative max-w-7xl mx-auto px-5 sm:px-8">
+      <div className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8">
         <div className="inline-flex items-center gap-3 text-[11px] uppercase tracking-[0.28em] text-steel mb-6">
           <FourPointStar className="w-3 h-3 text-ivory" />
           <span>{label}</span>

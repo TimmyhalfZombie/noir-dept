@@ -1,19 +1,32 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
+import { seoRoutes } from '../config/site';
 import { siteConfig } from '../config/siteConfig';
-import { useDocumentMeta } from '../hooks/useDocumentMeta';
+import { buildBreadcrumbSchema, buildFaqSchema } from '../lib/schema';
 import { CTABand } from '../components/CTABand';
 import { FourPointStar } from '../components/Motifs';
 import { PageHero } from '../components/PageHero';
 import { Reveal } from '../components/Reveal';
 import { SectionHeader } from '../components/SectionHeader';
+import { Seo } from '../components/Seo';
 import { ServiceCard } from '../components/ServiceCard';
+import { OrreryBg } from '../components/motion/OrreryBg';
+import { StitchDivider } from '../components/motion/StitchDivider';
 
 export function ServicesPage() {
-  useDocumentMeta(siteConfig.meta.services);
-
   const [openFaqId, setOpenFaqId] = useState<string | null>(
     siteConfig.services.faq.items[0]?.id ?? null
+  );
+
+  const schemas = useMemo(
+    () => [
+      buildBreadcrumbSchema([
+        { name: 'Home', path: '/' },
+        { name: 'Services', path: '/services' },
+      ]),
+      buildFaqSchema(siteConfig.services.faq.items),
+    ],
+    []
   );
 
   const toggleFaq = (id: string) => {
@@ -22,15 +35,24 @@ export function ServicesPage() {
 
   return (
     <>
-      {/* 1. Page Hero */}
+      <Seo
+        title={seoRoutes.services.title}
+        description={seoRoutes.services.description}
+        path={seoRoutes.services.path}
+        jsonLd={schemas}
+      />
+      {/* 1. Page Hero with Orrery background */}
       <PageHero
         label={siteConfig.services.hero.label}
         title={siteConfig.services.hero.title}
         subtitle={siteConfig.services.hero.subtitle}
+        background={<OrreryBg />}
       />
 
+      <StitchDivider />
+
       {/* 2. Service cards in 2-column grid */}
-      <section className="py-20 sm:py-24 md:py-28 border-b border-charcoal">
+      <section className="py-20 sm:py-24 md:py-28">
         <div className="max-w-7xl mx-auto px-5 sm:px-8">
           <Reveal>
             <SectionHeader
@@ -49,8 +71,10 @@ export function ServicesPage() {
         </div>
       </section>
 
+      <StitchDivider />
+
       {/* 3. How to Buy: horizontal 3-step strip with thin connecting line */}
-      <section className="py-20 sm:py-24 md:py-28 border-b border-charcoal bg-charcoal/20">
+      <section className="py-20 sm:py-24 md:py-28 bg-charcoal/20">
         <div className="max-w-7xl mx-auto px-5 sm:px-8">
           <Reveal>
             <SectionHeader
@@ -89,8 +113,10 @@ export function ServicesPage() {
         </div>
       </section>
 
+      <StitchDivider />
+
       {/* 4. Condition guide table/legend (editable placeholder rows) */}
-      <section className="py-20 sm:py-24 md:py-28 border-b border-charcoal">
+      <section className="py-20 sm:py-24 md:py-28">
         <div className="max-w-7xl mx-auto px-5 sm:px-8">
           <Reveal>
             <SectionHeader
@@ -124,7 +150,7 @@ export function ServicesPage() {
                     <td className="py-5 pr-6 font-serif text-lg sm:text-xl text-ivory whitespace-nowrap">
                       {item.grade}
                     </td>
-                    <td className="py-5 text-sm sm:text-base text-stone italic">
+                    <td className="py-5 text-sm sm:text-base text-steel">
                       {item.description}
                     </td>
                   </tr>
@@ -134,6 +160,8 @@ export function ServicesPage() {
           </Reveal>
         </div>
       </section>
+
+      <StitchDivider />
 
       {/* 5. FAQ Accordion */}
       <section className="py-20 sm:py-24 md:py-28">
@@ -181,7 +209,7 @@ export function ServicesPage() {
                       id={panelId}
                       className="pb-7 sm:pl-40 pr-12"
                     >
-                      <p className="text-sm sm:text-base text-stone italic leading-relaxed max-w-2xl">
+                      <p className="text-sm sm:text-base text-steel leading-relaxed max-w-2xl">
                         {item.answer}
                       </p>
                     </div>
@@ -193,8 +221,12 @@ export function ServicesPage() {
         </div>
       </section>
 
-      {/* 6. Final CTA band */}
+      <StitchDivider />
+
+      {/* 6. Final CTA band with Planetrise */}
       <CTABand />
     </>
   );
 }
+
+export default ServicesPage;
