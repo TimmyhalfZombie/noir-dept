@@ -104,8 +104,12 @@ export function OrreryBg() {
                   className={orbit.stitchClass}
                 />
 
-                {/* Traveling star + upright step number */}
-                <g transform={reducedMotion ? `translate(${sx.toFixed(1)} ${sy.toFixed(1)})` : undefined}>
+                {/* Traveling star + upright step number. data-ink-float: drawn live above the
+                    theme-transition overlay instead of in its snapshot (src/ui/liveFloat.ts). */}
+                <g
+                  data-ink-float=""
+                  transform={reducedMotion ? `translate(${sx.toFixed(1)} ${sy.toFixed(1)})` : undefined}
+                >
                   {!reducedMotion && (
                     <animateMotion
                       dur={orbit.orbitDur}

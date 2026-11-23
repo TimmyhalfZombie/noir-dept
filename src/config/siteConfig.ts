@@ -139,7 +139,7 @@ export const siteConfig = {
     },
     founder: {
       label: '03 / FROM THE FOUNDER',
-      portraitSrc: '/founder-mono.jpg',
+      portraitSrc: '/images/founder.jpg',
       portraitAlt: 'Founder of NOIR DEPT.',
       paragraphs: [
         "I started NOIR DEPT. because I kept finding pieces that deserved better than the bottom of a thrift pile. A good hoodie with the right label and the right wear says something new clothes can't.",

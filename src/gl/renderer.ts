@@ -78,11 +78,12 @@ export class InkRenderer {
   /** Returns null when WebGL2 is unavailable. */
   static create(canvas: HTMLCanvasElement): InkRenderer | null {
     const gl = canvas.getContext('webgl2', {
-      alpha: false, // opaque: CSS opacity fades it straight onto the live DOM
+      // Transparent where the ink has spread, so the live page (new theme) shows through.
+      alpha: true,
       antialias: false,
       depth: false,
       stencil: false,
-      premultipliedAlpha: false,
+      premultipliedAlpha: true,
       preserveDrawingBuffer: false,
       powerPreference: 'high-performance',
     });
@@ -187,7 +188,8 @@ export class InkRenderer {
     const index = this.activeComposite === 0 ? 1 : 0;
     const target = this.ensureComposite(index);
     gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
-    const ok = this.render(frame);
+    // Opaque: the frozen frame must contain the inked part too (the live page isn't in it).
+    const ok = this.render(frame, false);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     if (!ok) return false;
     target.scrollX = window.scrollX;
@@ -198,8 +200,24 @@ export class InkRenderer {
 
   draw(frame: InkFrame): void {
     if (this.lost) return;
-    this.render(frame);
+    this.render(frame, true);
   }
+
+  /**
+   * Overlay opacity (0 = the ink has spread there, live page visible; 1 = old-theme image) at
+   * a viewport point in CSS px. Must be called right after draw(), in the same task.
+   */
+  alphaAt(x: number, y: number): number {
+    if (this.lost) return 1;
+    const gl = this.gl;
+    const px = Math.round(x * this.canvasScale);
+    const py = this.canvas.height - 1 - Math.round(y * this.canvasScale);
+    if (px < 0 || py < 0 || px >= this.canvas.width || py >= this.canvas.height) return 1;
+    gl.readPixels(px, py, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, this.pixel);
+    return this.pixel[3] / 255;
+  }
+
+  private readonly pixel = new Uint8Array(4);
 
   // ---------- internals ----------
 
@@ -265,7 +283,8 @@ export class InkRenderer {
     };
   }
 
-  private render(frame: InkFrame): boolean {
+  /** `live`: leave the inked area transparent (see uLive in the shader). */
+  private render(frame: InkFrame, live: boolean): boolean {
     const from = this.sampler(frame.from);
     const to = this.sampler(frame.to);
     if (!from || !to) return false;
@@ -307,6 +326,7 @@ export class InkRenderer {
     gl.uniform1f(uniform('uSoftness'), inkParams.softness);
     gl.uniform1f(uniform('uDrift'), inkParams.drift);
     gl.uniform3fv(uniform('uRimColor'), RIM_COLOR[frame.to]);
+    gl.uniform1f(uniform('uLive'), live ? 1 : 0);
 
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     return true;

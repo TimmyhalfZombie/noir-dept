@@ -226,6 +226,10 @@ export async function capturePage(theme: Theme, scale: number, maxTextureSize: n
         // (src/ui/liveRing.ts), so leave them out of the still image. Removing SVG children
         // doesn't affect layout.
         doc.querySelectorAll('[data-ink-ring-band]').forEach((el) => el.remove());
+
+        // SMIL-animated groups would be drawn at their first frame in a fallback font;
+        // they're drawn live above the overlay instead (src/ui/liveFloat.ts).
+        doc.querySelectorAll('[data-ink-float]').forEach((el) => el.remove());
       },
     });
   } finally {

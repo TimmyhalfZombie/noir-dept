@@ -54,6 +54,10 @@ uniform float uNoiseScale;  // noise frequency multiplier
 uniform float uSoftness;    // frontier half-width, CSS px
 uniform float uDrift;       // time evolution speed
 uniform vec3 uRimColor;     // pigment colour pooled at the frontier
+// 1 = live reveal: where the ink has spread the overlay is transparent, so the real page
+//     (already in the new theme) shows through; output is premultiplied alpha.
+// 0 = opaque: mix the two snapshots (used to freeze a frame when a transition is interrupted).
+uniform float uLive;
 
 out vec4 outColor;
 
@@ -126,7 +130,7 @@ void main() {
   float inner = R * (1.0 - A_SUM) + cleanup - FIBRE_PX - THIN_MAX_PX - uSoftness * 2.0;
   float outer = R * (1.0 + A_SUM) * (1.0 + TENDRIL_REACH * uTendril) + cleanup + FIBRE_PX + SPECK_PX + uSoftness * 2.0;
   if (d < inner) {
-    outColor = vec4(sampleDoc(uTo, uToSize, uToMap, devPx), 1.0);
+    outColor = uLive > 0.5 ? vec4(0.0) : vec4(sampleDoc(uTo, uToSize, uToMap, devPx), 1.0);
     return;
   }
   if (d > outer) {
@@ -204,14 +208,21 @@ void main() {
   }
 
   vec3 from = sampleDoc(uFrom, uFromSize, uFromMap, devPx);
-  vec3 to = sampleDoc(uTo, uToSize, uToMap, devPx);
-  vec3 col = mix(from, to, cov);
 
   // Pigment rim pooled at the frontier (darker for ink, brighter for bleach).
   float rimX = (f + soft * 1.1) / (soft * 1.4 + 1.2);
-  float rim = exp(-rimX * rimX) * inked;
-  col = mix(col, uRimColor, rim * 0.45);
+  float rim = exp(-rimX * rimX) * inked * 0.45;
 
+  if (uLive > 0.5) {
+    // Same result as mix(mix(from, page, cov), rim colour, rim) over the live page, written
+    // as premultiplied colour + coverage so the page itself fills the inked part.
+    vec3 rgb = (1.0 - rim) * (1.0 - cov) * from + rim * uRimColor;
+    outColor = vec4(rgb, 1.0 - (1.0 - rim) * cov);
+    return;
+  }
+
+  vec3 to = sampleDoc(uTo, uToSize, uToMap, devPx);
+  vec3 col = mix(mix(from, to, cov), uRimColor, rim);
   outColor = vec4(col, 1.0);
 }
 `;

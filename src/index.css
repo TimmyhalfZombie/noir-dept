@@ -99,16 +99,6 @@
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
-/* Freeze CSS animations while the ink overlay is up. Done in CSS (not Animation.pause()/play())
-   because calling pause()/play() on a CSS animation permanently detaches it from
-   `animation-play-state`, which would break the off-screen `.motion-paused` / `.ring-paused` rules.
-   The hero ring ([data-ink-ring]) keeps spinning: a live copy of it is drawn above the overlay. */
-html[data-theme-transitioning] *:not([data-ink-live], [data-ink-live] *, [data-ink-ring] *),
-html[data-theme-transitioning] *:not([data-ink-live], [data-ink-live] *, [data-ink-ring] *)::before,
-html[data-theme-transitioning] *:not([data-ink-live], [data-ink-live] *, [data-ink-ring] *)::after {
-  animation-play-state: paused !important;
-}
-
 /* Live copy of the hero ring, above the ink canvas (z 40) and below the navbar (z 50).
    Its colours ease to the new theme as the ink reaches it (see src/ui/liveRing.ts). */
 .ink-live-ring-layer {
@@ -127,6 +117,12 @@ html[data-theme-transitioning] *:not([data-ink-live], [data-ink-live] *, [data-i
 
 .ink-live-ring * {
   transition: fill 0.4s ease, stroke 0.4s ease;
+}
+
+/* Live copies of SMIL-animated groups (src/ui/liveFloat.ts): no colour transition, they
+   switch the moment the ink covers them, together with the page around them. */
+.ink-live-float {
+  position: absolute;
 }
 
 /* CSS colour cross-fade fallback (no WebGL2, reduced motion, or before snapshots are ready) */
